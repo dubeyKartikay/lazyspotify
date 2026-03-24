@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -24,3 +25,11 @@ func SpotifyURLToURI(raw string) (string, error) {
 
 	return fmt.Sprintf("spotify:%s:%s", typ, id), nil
 }
+
+func EnsureExists(dir string) error {
+  if _, err := os.Stat(dir); os.IsNotExist(err) {
+    return os.MkdirAll(dir, 0755)
+  }
+  return nil
+}
+

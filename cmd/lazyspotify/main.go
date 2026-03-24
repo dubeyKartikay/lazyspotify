@@ -1,7 +1,7 @@
 package main
 import ("flag"
-				"fmt"
 				"github.com/dubeyKartikay/lazyspotify/cli"
+			ui "github.com/dubeyKartikay/lazyspotify/ui/v1"
 )
 func main() {
 	flag.Parse()
@@ -9,6 +9,6 @@ func main() {
 		case flag.NArg() > 0:
       cli.Run(flag.Args())
     default:
-      fmt.Println("Running the TUI")
+			ui.RunTui()
 	}
 }

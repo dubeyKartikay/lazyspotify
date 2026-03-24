@@ -1,10 +1,12 @@
 package librespot
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/dubeyKartikay/lazyspotify/core/deamon"
+	"github.com/dubeyKartikay/lazyspotify/core/utils"
 )
 
 type Librespot struct {
@@ -14,13 +16,20 @@ type Librespot struct {
 	Ready  chan error
 }
 
-func InitLibrespot(panicOnDaemonFailure bool) (*Librespot, error) {
-	deamonManager, err := deamon.NewDeamonManager([]string{"/Users/user/personal/go-librespot/daemon"})
+func InitLibrespot(ctx context.Context, userId string, accessToken string,panicOnDaemonFailure bool) (*Librespot, error) {
+	cfg := utils.GetConfig().Librespot
+	librespotCommand := cfg.Daemon.Cmd
+	librespotCommand = append(librespotCommand, "--config_dir", GetLibrespotConfigDir())
+	err := InitLibrespotConfig(ctx, userId, accessToken)
+  if err != nil {
+    return nil, err
+	}
+	deamonManager, err := deamon.NewDeamonManager(librespotCommand)
 	if err != nil {
 		return nil, err
 	}
 
-	librespotApiServer := NewLibrespotApiServer("127.0.0.1", "4040")
+	librespotApiServer := NewLibrespotApiServer(cfg.Host, cfg.Port)
 	librespotApiClient := NewLibrespotApiClient(librespotApiServer)
 	l := &Librespot{Deamon: deamonManager, Server: librespotApiServer, Client: librespotApiClient, Ready: make(chan error, 1)}
 	go notifyWhenReady(l)
@@ -39,3 +48,5 @@ func notifyWhenReady(l *Librespot) {
 	}
 	l.Ready <- fmt.Errorf("daemon did not become ready before timeout")
 }
+
+

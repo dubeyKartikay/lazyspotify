@@ -3,8 +3,9 @@ package deamon
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
+	"github.com/dubeyKartikay/lazyspotify/core/logger"
+	"github.com/dubeyKartikay/lazyspotify/core/utils"
 )
 
 type DeamonProcess struct {
@@ -19,19 +20,16 @@ func NewDeamonProcess(ctx context.Context, args []string)(DeamonProcess,error){
 }
 
 func (d *DeamonProcess) StartDeamon() error {
-	logFile, err := os.OpenFile("daemon.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666) // TODO: create deamon log in config DIR
-	if err != nil {
-		d.cancel()
-		return fmt.Errorf("could not open log file: %w", err)
-	}
-	d.cmd.Stdout = logFile
-	d.cmd.Stderr = logFile
+
+  lumberjackLogger := utils.NewLumberjackLogger("deamon.log")
+	d.cmd.Stdout = lumberjackLogger
+	d.cmd.Stderr = lumberjackLogger
 
 	if err := d.cmd.Start(); err != nil {
 		d.cancel()
 		return fmt.Errorf("failed to start daemon: %w", err)
 	}
-	fmt.Println("deamon process", d.cmd.Process)
+	logger.Log.Info().Msgf("daemon process %v", d.cmd.Process)
 	return nil
 }
 

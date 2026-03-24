@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dubeyKartikay/lazyspotify/core/logger"
+	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	"github.com/dubeyKartikay/lazyspotify/librespot/models"
 )
 
@@ -20,7 +22,7 @@ const (
 
 type LibrespotApiServer struct {
 	host string
-	port string
+	port int
 }
 
 type LibrespotApiClient struct {
@@ -28,7 +30,7 @@ type LibrespotApiClient struct {
   client *http.Client
 }
 
-func NewLibrespotApiServer(host string, port string) *LibrespotApiServer {
+func NewLibrespotApiServer(host string, port int) *LibrespotApiServer {
   return &LibrespotApiServer{
     host: host,
     port: port,
@@ -36,23 +38,24 @@ func NewLibrespotApiServer(host string, port string) *LibrespotApiServer {
 }
 
 func (l *LibrespotApiServer) GetServerUrl() string {
-	return fmt.Sprintf("http://%s:%s", l.host, l.port)
+	return fmt.Sprintf("http://%s:%d", l.host, l.port)
 }
 
 func NewLibrespotApiClient(server *LibrespotApiServer) *LibrespotApiClient {
+	cfg := utils.GetConfig().Librespot
 	client := http.Client{
-		Timeout: 30*time.Second,
+		Timeout: time.Duration(cfg.Timeout) * time.Second,
 	}
 	return &LibrespotApiClient{
 		client: &client,
-    server: server,
+		server: server,
 	}
 }
 
 func (l *LibrespotApiClient) GetHealth() (*models.HealthResponse,error) {
 	url := l.server.GetServerUrl() + healthPath;
 	req, err := http.NewRequest("GET", url, nil)
-	fmt.Println("Requesting", url)
+	logger.Log.Debug().Str("url", url).Msg("requesting health")
 	if err != nil {
 		return nil,err
 	}
@@ -80,13 +83,31 @@ func (l *LibrespotApiClient) Play(ctx context.Context ,uri string, skip_to_uri s
 	}
   req, err := http.NewRequestWithContext(ctx,"POST", url, bytes.NewReader(playRequestJson))
 	req.Header.Set("Content-Type", "application/json")
-  fmt.Printf("Requesting %+v\n", req)
+  logger.Log.Debug().Msgf("requesting %+v", req)
   if err != nil {
     return 500
   }
-  resp, err := DoWithRetry(l.client, req, 3, 100*time.Millisecond)
+	cfg := utils.GetConfig().Librespot
+	resp, err := DoWithRetry(l.client, req, cfg.MaxRetries, time.Duration(cfg.RetryDelay)*time.Millisecond)
   if err != nil {
-    fmt.Println(err)
+    logger.Log.Error().Err(err).Msg("play request failed")
+    return 500
+  }
+  defer resp.Body.Close()
+  return resp.StatusCode
+}
+
+func (l *LibrespotApiClient) PlayPause(ctx context.Context) int{
+  url := l.server.GetServerUrl() + playpausePath;
+  req, err := http.NewRequestWithContext(ctx,"POST", url, nil)
+  logger.Log.Debug().Msgf("requesting %+v", req)
+  if err != nil {
+    return 500
+  }
+	cfg := utils.GetConfig().Librespot
+	resp, err := DoWithRetry(l.client, req, cfg.MaxRetries, time.Duration(cfg.RetryDelay)*time.Millisecond)
+  if err != nil {
+    logger.Log.Error().Err(err).Msg("playpause request failed")
     return 500
   }
   defer resp.Body.Close()
@@ -108,11 +129,11 @@ func DoWithRetry(client *http.Client, req *http.Request, maxRetries int, retryDe
 		if err == nil && resp.StatusCode < 500 {
 			return resp, nil
 		} else{
-			fmt.Println(err)
+			logger.Log.Error().Err(err).Msg("request error")
 		}
 
 		if resp != nil {
-			fmt.Printf("%+v\b",resp)
+			logger.Log.Debug().Msgf("%+v", resp)
 			resp.Body.Close()
 		}
 
@@ -121,7 +142,7 @@ func DoWithRetry(client *http.Client, req *http.Request, maxRetries int, retryDe
 		}
 
 		backoffDuration := time.Duration(math.Pow(2, float64(i))) * retryDelay
-		fmt.Printf("Request failed. Retrying in %v...\n", backoffDuration)
+		logger.Log.Warn().Dur("backoff", backoffDuration).Msg("request failed, retrying")
 		time.Sleep(backoffDuration)
 	}
 

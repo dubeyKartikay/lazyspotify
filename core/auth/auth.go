@@ -2,37 +2,41 @@ package auth
 
 import (
 	"context"
-	"fmt"
-	"log"
-
+	"github.com/dubeyKartikay/lazyspotify/core/logger"
+	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	"github.com/zmb3/spotify/v2"
 	"golang.org/x/oauth2"
 )
 
 type Authenticator struct {
-	authServer  *AuthServer
+	AuthServer  *AuthServer
 	authService *AuthService
 	keyring     *Keyring
+	tokenKey    string
+	oauthErrCh  chan error
 }
-
-const spotifyTokenKey = "token-v2"
 
 func New() *Authenticator {
 	authServer := NewAuthServer()
+	authService := NewAuthService(authServer.GetOauthRedirectURI())
+	oauthCallbackFunc, err := authService.MakeOauthCallbackHandler()
+	authServer.InitAuthServer(oauthCallbackFunc)
 	return &Authenticator{
-		authServer:  authServer,
+		AuthServer:  authServer,
 		keyring:     NewSpotifyKeyring(),
-		authService: NewAuthService(authServer),
+		authService: authService,
+		tokenKey:    utils.GetConfig().Auth.Keyring.Key,
+    oauthErrCh:  err,
 	}
 }
 
 func (a *Authenticator) GetAuthToken(ctx context.Context) (*oauth2.Token, error) {
-	tkn, err := a.keyring.GetToken(spotifyTokenKey)
-	if err == nil {
-		fmt.Printf("## token from keyring: %v\n", tkn.AccessToken)
-		return tkn, nil
+	tkn, err := a.keyring.GetToken(a.tokenKey)
+	if err != nil {
+		logger.Log.Error().Err(err).Msg("error getting token")
+    return nil, err
 	}
-	return a.ReAuthenticate(ctx)
+  return tkn, nil
 }
 
 func (a *Authenticator) GetClient(ctx context.Context) (*spotify.Client, error) {
@@ -43,19 +47,31 @@ func (a *Authenticator) GetClient(ctx context.Context) (*spotify.Client, error) 
 	return a.authService.GetSpotifyClient(tkn), nil
 }
 
-func (a *Authenticator) ReAuthenticate(ctx context.Context) (*oauth2.Token, error) {
-	fmt.Println("AuVthtenticating with spotify")
-	tkn, err := a.authService.Authenticate(ctx, a.authServer)
+func (a *Authenticator) ReAuthenticate(ctx context.Context, updates chan<- string) (*oauth2.Token, error) {
+	logger.Log.Info().Msg("authenticating with spotify")
+	severErrCh := a.AuthServer.Start()
+  defer a.AuthServer.Shutdown()
+	var tkn *oauth2.Token
+	updates <- "awaiting authentication"
+	select {
+  case err := <-a.oauthErrCh:
+    return nil, err
+  case err := <-severErrCh:
+    return nil, err
+	case tkn = <-a.authService.GetTokenChannel():
+  }
+	updates <- "success"
+	err := a.saveToken(tkn)
 	if err != nil {
-		return nil, err
-	}
-	err = a.saveToken(tkn)
-	if err != nil {
-		log.Println("error saving token", err)
+		logger.Log.Error().Err(err).Msg("error saving token")
 	}
 	return tkn, nil
 }
 
+func (a *Authenticator) GetAuthURL() string {
+  return a.authService.GetAuthURL()
+}
+
 func (a *Authenticator) saveToken(token *oauth2.Token) error {
-	return a.keyring.SetToken(spotifyTokenKey, token)
+	return a.keyring.SetToken(a.tokenKey, token)
 }

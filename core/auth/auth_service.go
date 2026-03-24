@@ -16,10 +16,12 @@ type AuthService struct {
 	authConfig *AuthConfig
 }
 
-func NewAuthService(authServer *AuthServer) *AuthService {
+
+
+func NewAuthService(redirectURI string) *AuthService {
 	authConfig := NewAuthConfig()
 	sptAuth := spotifyauth.New(
-		spotifyauth.WithRedirectURL(authServer.GetOauthRedirectURI()),
+		spotifyauth.WithRedirectURL(redirectURI),
 		spotifyauth.WithScopes(
 			"app-remote-control",
 			spotifyauth.ScopeUserReadPrivate,
@@ -48,7 +50,7 @@ func NewAuthService(authServer *AuthServer) *AuthService {
 	}
 }
 
-func (a *AuthService) getAuthURL() string {
+func (a *AuthService) GetAuthURL() string {
 	return a.sptAuth.AuthURL(a.authConfig.state,
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 		oauth2.SetAuthURLParam("code_challenge", a.authConfig.codeChallenge),
@@ -56,26 +58,12 @@ func (a *AuthService) getAuthURL() string {
 	)
 }
 
-func (a *AuthService) Authenticate(ctx context.Context, authServer *AuthServer) (*oauth2.Token, error) {
-	oauthRedirectCallbackFunc, oauthErrCh := a.makeOauthCallbackHandler()
-	authServer.InitAuthServer(oauthRedirectCallbackFunc)
-	serverErrch := authServer.Start(a.authConfig)
-	defer authServer.Shutdown()
-	url := a.getAuthURL()
-	fmt.Println("Please log in to Spotify by visiting the following page in your browser:", url)
-	select {
-	case tkn := <-a.tknChannel:
-		return tkn, nil
-	case err := <-serverErrch:
-		return nil, err
-	case err := <-oauthErrCh:
-		return nil, err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+func (a *AuthService) GetTokenChannel() chan *oauth2.Token {
+  return a.tknChannel
 }
 
-func (a *AuthService) makeOauthCallbackHandler() (func(w http.ResponseWriter, r *http.Request), chan error) {
+
+func (a *AuthService) MakeOauthCallbackHandler() (func(w http.ResponseWriter, r *http.Request), chan error) {
 	errCh := make(chan error, 1)
 	callback := func(w http.ResponseWriter, r *http.Request) {
 		tok, err := a.sptAuth.Token(r.Context(), a.authConfig.state, r, oauth2.SetAuthURLParam("code_verifier", a.authConfig.codeVerifier))

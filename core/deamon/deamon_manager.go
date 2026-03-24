@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sync/atomic"
+	"github.com/dubeyKartikay/lazyspotify/core/logger"
 )
 
 type DeamonManager struct {
@@ -14,7 +14,6 @@ type DeamonManager struct {
 	restartCount            int
 	deamonErrorChannel      chan error
 	RestartFailErrorChannel chan error
-	stopping                atomic.Bool
 }
 
 func NewDeamonManager(cmd []string) (DeamonManager, error) {
@@ -32,8 +31,7 @@ func NewDeamonManager(cmd []string) (DeamonManager, error) {
 }
 
 func (d *DeamonManager) StartDeamon() error {
-	fmt.Println("Starting Deamon")
-	d.stopping.Store(false)
+	logger.Log.Info().Msg("starting daemon")
 	err := d.deamonProcess.StartDeamon()
 	if err != nil {
 		return err
@@ -57,23 +55,15 @@ func (d *DeamonManager) StopDeamon() {
 	if d.deamonProcess.cmd.Process == nil {
 		return
 	}
-	d.stopping.Store(true)
 	err := d.deamonProcess.cmd.Process.Signal(os.Interrupt)
 	if err != nil {
 		d.forceKill()
 	}
-	//  time.Sleep(5 * time.Second)
-	// fmt.Printf("%+v",d.deamonProcess.cmd.Process)
-	// fmt.Printf("%+v",d.deamonProcess.cmd.ProcessState)
 }
 
 func (d *DeamonManager) listenForErrors() {
 	err := <-d.deamonErrorChannel
-	if d.stopping.Load() {
-		return
-	}
-	fmt.Println("deamon error:", err)
-	fmt.Printf("%+v", d)
+	logger.Log.Error().Err(err).Msgf("daemon error: %+v", d)
 	if !d.restartOnFailure {
 		d.StopDeamon()
 		d.reportRestartFailure(err)
@@ -98,9 +88,9 @@ func (d *DeamonManager) reportRestartFailure(err error) {
 	}
 }
 func (d *DeamonManager) forceKill() {
-	fmt.Println("Force killing process...")
+	logger.Log.Warn().Msg("force killing process")
 	if err := d.deamonProcess.cmd.Process.Kill(); err != nil {
-		fmt.Printf("Failed to kill process: %v\n", err)
+		logger.Log.Error().Err(err).Msg("failed to kill process")
 	}
 	if d.deamonProcess.cancel != nil {
 		d.deamonProcess.cancel()

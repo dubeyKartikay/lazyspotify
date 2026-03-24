@@ -3,46 +3,66 @@ package player
 import (
 	"context"
 	"fmt"
-	"time"
-
+	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/librespot"
 )
 
-func PlayTrack(ctx context.Context, uri string) error {
-	l, err := librespot.InitLibrespot(true)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	if err := l.Deamon.StartDeamon(); err != nil {
-		return err
-	}
-	defer l.Deamon.StopDeamon()
 
-	select {
-	case err := <-l.Ready:
-		if err != nil {
-			return err
-		}
-	case err := <-l.Deamon.RestartFailErrorChannel:
-		return fmt.Errorf("daemon is no longer available: %w", err)
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	fmt.Println(uri)
+type Player struct{
+	librespot *librespot.Librespot
+}
+func NewPlayer(ctx context.Context,userId string, accessToken string) *Player{
+	l, err := librespot.InitLibrespot(ctx, userId, accessToken, true)
+  if err != nil {
+    logger.Log.Error().Err(err).Msg("failed to init librespot")
+    return nil
+  }
+  return &Player{
+    librespot: l,
+  }
+}
+
+func (p *Player) Play(ctx context.Context) error {
+  return p.PlayTrack(ctx, "")
+}
+
+func (p *Player) PlayTrack(ctx context.Context, uri string) error {
+	l := p.librespot
+	logger.Log.Info().Str("uri", uri).Msg("playing track")
 	res := l.Client.Play(ctx, uri, "", false)
 	if res >= 400 {
 		return fmt.Errorf("failed to play track: daemon returned status %d", res)
 	}
-
-	select {
-	case err := <-l.Deamon.RestartFailErrorChannel:
-		return fmt.Errorf("daemon is no longer available: %w", err)
-	case <-time.After(30 * time.Second):
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	fmt.Println(res)
+	logger.Log.Info().Int("status", res).Msg("play response")
 	return nil
+}
 
+func (p *Player) PlayPause(ctx context.Context) error {
+  l := p.librespot
+  logger.Log.Info().Msg("pausing track")
+  res := l.Client.PlayPause(ctx)
+  if res >= 400 {
+    return fmt.Errorf("failed to pause track: daemon returned status %d", res)
+  }
+  logger.Log.Info().Int("status", res).Msg("pause response")
+  return nil
+}
+
+func (p *Player) Start(ctx context.Context) error {
+  l := p.librespot
+	err := l.Deamon.StartDeamon()
+  if err != nil {
+    return err
+  }
+  return nil
+}
+
+func (p *Player) WaitTillReady() error {
+  l := p.librespot
+  return <- l.Ready
+}
+
+func (p *Player) Destroy(ctx context.Context) {
+  l := p.librespot
+  l.Deamon.StopDeamon()
 }
