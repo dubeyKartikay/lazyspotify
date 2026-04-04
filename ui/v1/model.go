@@ -18,6 +18,7 @@ type Model struct {
 	volumeInfo    VolumeInfo
 	player        *player.Player
 	spotifyClient *spotify.SpotifyClient
+	spoke         Spoke
 	width         int
 	height        int
 }
@@ -171,6 +172,7 @@ func (m *Model) shutdown() {
 
 func (m *Model) start() error {
 	ctx := context.Background()
+	m.spoke = NewSpoke(m.width, m.height)
 	var err error
 	m.authModel = newAuthModel()
 	if m.width != 0 || m.height != 0 {

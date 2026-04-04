@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"fmt"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
@@ -10,7 +9,9 @@ import (
 )
 
 func newModel() Model {
-	return Model{}
+	return Model{
+		spoke: NewSpoke(0, 0),
+	}
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -24,7 +25,7 @@ func (m *Model) Init() tea.Cmd {
 		}
 		return nil
 	}
-	return cmd
+	return tea.Batch(cmd, DoTickSpokes())
 }
 
 func (m *Model) View() tea.View {
@@ -32,8 +33,9 @@ func (m *Model) View() tea.View {
 	if m.authModel != nil && m.authModel.needsAuth {
 		return m.authModel.View()
 	}
-	v := tea.NewView(fmt.Sprintf("Hello World \n\n\n") + helpStyle.Render("q: exit\n"))
-	return v
+	spoke := m.spoke
+	v := spoke.View()
+	return tea.NewView(v + "\n" + helpStyle.Render("Press q to quit"))
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -48,6 +50,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.setSize(msg.Width, msg.Height)
 		return m, nil
+	case NextFrameMsg:
+		logger.Log.Debug().Msg("next frame")
+		m.spoke.NextFrame()
+		return m, DoTickSpokes()
 	}
 	if m.authModel != nil && m.authModel.needsAuth {
 		newM, cmd := m.authModel.Update(msg)
