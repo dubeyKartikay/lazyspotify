@@ -45,6 +45,16 @@ func (s *SpotifyClient) GetFirstSavedTrack(ctx context.Context) (string, error) 
 	logger.Log.Info().Any("playlists",tracks)
   return string(tracks.Tracks[0].URI), nil
 }
+
+func  (s *SpotifyClient) GetUserLibrary(ctx context.Context) (string, error) {
+	user, err := s.client.CurrentUser(ctx)
+	if(err != nil) {
+		logger.Log.Error().Err(err).Msg("error getting user library")
+		return "", err
+	}
+	return user.ID, nil
+	
+}
 func IsAuthError(err error) bool {
 	var spotifyErr spotify.Error
 	if(errors.Is(err,keyring.ErrNotFound)) {

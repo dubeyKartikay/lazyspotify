@@ -10,7 +10,7 @@ import (
 
 func newModel() Model {
 	return Model{
-		cassettePlayer: NewCassettePlayer(),
+		mediaCenter: NewMediaCenter(),
 	}
 }
 
@@ -33,8 +33,8 @@ func (m *Model) View() tea.View {
 	if m.authModel != nil && m.authModel.needsAuth {
 		return m.authModel.View()
 	}
-	cassette := m.cassettePlayer
-	v := cassette.View()
+	mediaCenter := m.mediaCenter
+	v := mediaCenter.View()
 	return tea.NewView(v + "\n" + helpStyle.Render("Press q to quit"))
 }
 
@@ -52,10 +52,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case NextSpokeFrameMsg:
 		logger.Log.Debug().Msg("next frame")
-		m.cassettePlayer.NextFrame(m.playing)
+		m.NextFrame()
 		return m, DoTickSpokes()
 	case NextButtonFrameMsg:
-		m.cassettePlayer.NextButtonFrame()
+		m.NextButtonFrame()
 		return m,nil
 	}
 	if m.authModel != nil && m.authModel.needsAuth {
@@ -69,26 +69,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case " ", "p":
 			m.playing = !m.playing
 			if m.playing {
-				m.cassettePlayer.HandleButtonPress(PlayButton)
+				m.HandleButtonPress(PlayButton)
 			} else {
-				m.cassettePlayer.HandleButtonPress(PauseButton)
+				m.HandleButtonPress(PauseButton)
 			}
 			m.playPause()
 			return m,tea.Batch(cmd, DoTickButtonPress())
 		case "right", "l", "ctrl+f", "]":
-			m.cassettePlayer.HandleButtonPress(SeekForwardButton)
+			m.HandleButtonPress(SeekForwardButton)
 			m.seekForward()
 			return m,tea.Batch(cmd, DoTickButtonPress())
 		case "left", "h", "ctrl+b", "[":
-			m.cassettePlayer.HandleButtonPress(SeekBackwardButton)
+			m.HandleButtonPress(SeekBackwardButton)
 			m.seekBackward()
 			return m,tea.Batch(cmd, DoTickButtonPress())
 		case "n", "ctrl+s":
-			m.cassettePlayer.HandleButtonPress(NextButton)
+			m.HandleButtonPress(NextButton)
 			m.next()
 			return m,tea.Batch(cmd, DoTickButtonPress())
 		case "N", "ctrl+r":
-			m.cassettePlayer.HandleButtonPress(PreviousButton)
+			m.HandleButtonPress(PreviousButton)
 			m.previous()
 			return m,tea.Batch(cmd, DoTickButtonPress())
 		case "j", "down", "ctrl+p":

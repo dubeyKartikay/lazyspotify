@@ -61,8 +61,8 @@ func (c *CassettePlayer) View() string {
 		buttons = lipgloss.JoinHorizontal(lipgloss.Left, buttons," ",c.controls[i].View())
 	}
 
-	playerW := max(60, max(lipgloss.Width(buttons), cassetteW)+6)
-	playerH := max(4, cassetteH + lipgloss.Height(buttons) +2)
+	playerW := max(lipgloss.Width(buttons), cassetteW)+2
+	playerH := cassetteH + lipgloss.Height(buttons)+2
 	player := c.style.Render(playerShell(playerW, playerH))
 	cassetteTapeX := playerW - cassetteW - 2
 	layers := []*lipgloss.Layer{
@@ -77,21 +77,12 @@ func (c *CassettePlayer) View() string {
 
 func playerShell(innerW int, innerH int) string {
 	lines := make([]string, 0, innerH+2)
-	// Top edge with rounded corners and decorative double-line accent
-	lines = append(lines, "╭─"+strings.Repeat("─", innerW-2)+"─╮")
-	for i := 0; i < innerH; i++ {
+	lines = append(lines, strings.Repeat(" ", innerW))
+	for range innerH {
 		fill := strings.Repeat(" ", innerW)
-		if i == 0 {
-			// Subtle inner ridge near the top
-			fill = "┄" + strings.Repeat("┈", innerW-2) + "┄"
-		}
-		if i == innerH-1 {
-			fill = strings.Repeat("─", innerW)
-		}
-		lines = append(lines, "│"+fill+"│")
+		lines = append(lines,fill)
 	}
-	lines = append(lines, "╰─"+strings.Repeat("─", innerW-2)+"─╯")
-
+	lines = append(lines, strings.Repeat(" ", innerW))
 	return  lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 

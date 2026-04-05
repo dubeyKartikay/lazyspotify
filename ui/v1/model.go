@@ -18,7 +18,6 @@ type Model struct {
 	volumeInfo    VolumeInfo
 	player        *player.Player
 	spotifyClient *spotify.SpotifyClient
-	cassettePlayer CassettePlayer
 	mediaCenter   MediaCenter
 	width         int
 	height        int
@@ -221,5 +220,16 @@ func (m *Model) start() error {
 	m.playDailyMix()
 
 	return nil
+}
 
+func (m *Model) NextFrame()  {
+	m.mediaCenter.cassettePlayer.NextFrame(m.playing)
+}
+
+func (m *Model) NextButtonFrame(){
+	m.mediaCenter.cassettePlayer.NextButtonFrame()
+}
+
+func (m *Model) HandleButtonPress(buttonKind ButtonKind) {
+	m.mediaCenter.cassettePlayer.HandleButtonPress(buttonKind)
 }
