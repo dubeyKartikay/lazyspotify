@@ -42,7 +42,7 @@ func setFrames() []Frame {
 	return frames
 }
 
-func NewSpoke(width, height int) Spoke {
+func NewSpoke() Spoke {
 	return Spoke{
 		Frames: setFrames(),
 	}

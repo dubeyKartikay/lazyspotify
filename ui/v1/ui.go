@@ -10,7 +10,7 @@ import (
 
 func newModel() Model {
 	return Model{
-		spoke: NewSpoke(0, 0),
+		cassette: NewCassette(),
 	}
 }
 
@@ -33,8 +33,8 @@ func (m *Model) View() tea.View {
 	if m.authModel != nil && m.authModel.needsAuth {
 		return m.authModel.View()
 	}
-	spoke := m.spoke
-	v := spoke.View()
+	cassette := m.cassette
+	v := cassette.View()
 	return tea.NewView(v + "\n" + helpStyle.Render("Press q to quit"))
 }
 
