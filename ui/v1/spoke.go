@@ -22,7 +22,7 @@ func NewFrame(view string) Frame {
 	}
 }
 
-type NextFrameMsg struct{}
+type NextSpokeFrameMsg struct{}
 
 func setFrames() []Frame {
 	top := " .---. "
@@ -63,6 +63,6 @@ func (s *Spoke) NextFrame() {
 
 func DoTickSpokes() tea.Cmd {
 	return tea.Tick(180*time.Millisecond, func(t time.Time) tea.Msg {
-		return NextFrameMsg{}
+		return NextSpokeFrameMsg{}
 	})
 }

@@ -54,7 +54,7 @@ func (c *Cassette) cassetteLayers() []*lipgloss.Layer {
 
 	sidePad := 3
 	centerGap := maxInt(windowTrimW+4, tapeWindowW+6, 12)
-	innerW := sidePad*2 + leftReelW + centerGap + leftReelW
+	innerW := sidePad*2 + leftReelW + centerGap + leftReelW + 1
 	innerW = maxInt(innerW, labelW+6, subtitleW+6, writeProtectW+6)
 
 	reelYInner := 3

@@ -18,7 +18,7 @@ type Model struct {
 	volumeInfo    VolumeInfo
 	player        *player.Player
 	spotifyClient *spotify.SpotifyClient
-	cassette      Cassette
+	cassettePlayer CassettePlayer
 	width         int
 	height        int
 }
@@ -160,6 +160,7 @@ func (m *Model) playDailyMix() {
 	if err != nil {
 		logger.Log.Error().Err(err).Msg("failed to play daily mix")
 	}
+	m.playing = true
 }
 
 func (m *Model) shutdown() {
