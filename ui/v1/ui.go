@@ -63,7 +63,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd = m.NextButtonFrame()
 		return m, tea.Batch(cmd, centerCmd)
 	case MediaRequest:
-		startCmd := m.mediaCenter.StartLoading()
+		var startCmd tea.Cmd
+		if msg.showLoading {
+			startCmd = m.mediaCenter.StartLoading()
+		}
 		fetchCmd := m.HandleMediaRequest(msg)
 		return m, tea.Batch(startCmd, fetchCmd, centerCmd)
 	case startupCompleteMsg:
@@ -90,8 +93,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(setContentCmd, centerCmd)
 	case mediaLoadErrMsg:
 		logger.Log.Error().Err(msg.err).Msg("failed to get user library")
-		m.mediaCenter.visibleList.list.StopSpinner()
-		return m, tea.Batch(m.mediaCenter.visibleList.list.NewStatusMessage("Failed to load library"), centerCmd)
+		m.mediaCenter.StopSpinner()
+		return m, tea.Batch(m.mediaCenter.SetStatus("Failed to load library"), centerCmd)
+	case playTrackErrMsg:
+		logger.Log.Error().Err(msg.err).Msg("failed to play track")
+		return m, tea.Batch(m.mediaCenter.SetStatus("Failed to play track"), centerCmd)
+	case playTrackOkMsg:
+		m.playing = true
+		return m, tea.Batch(m.mediaCenter.SetStatus("Playing"), centerCmd)
 	}
 	if m.authModel != nil && m.authModel.needsAuth {
 		newM, cmd := m.authModel.Update(msg)
@@ -104,6 +113,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			nextKind := m.mediaCenter.NextListKind()
 			requestCmd := tea.Cmd(func() tea.Msg {
+				m.mediaCenter.lists.Items = nil
+				m.mediaCenter.lists.Push(newMediaList())
 				return MediaRequestForListKind(nextKind, 0)
 			})
 			return m, tea.Batch(requestCmd, centerCmd)

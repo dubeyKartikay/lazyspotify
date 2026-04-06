@@ -17,6 +17,7 @@ type mediaList struct {
 	styles styles
 	width  int
 	height int
+	title  string
 }
 
 type styles struct {
@@ -57,7 +58,7 @@ func newMediaList() mediaList {
 		PaddingLeft(1)
 	delegate.SetSpacing(1)
 	listModel := list.New(nil, delegate, 0, 0)
-	
+
 	styles := listModel.Styles
 	styles.Title = styles.Title.MarginLeft(1)
 
@@ -78,16 +79,12 @@ func newMediaList() mediaList {
 	}
 }
 
-func (m mediaList) View() string {
+func (m mediaList) View(panelNav string) string {
 	panel := m.styles.panel.Width(m.width).Height(m.height).Render("")
-	panelNav := m.renderPanelNav()
 	listWidth := m.width - 4
 	listHeight := m.height - 2
 	m.list.SetSize(listWidth, listHeight)
-	panelNavX := (m.width - lipgloss.Width(panelNav)) / 2
-	if panelNavX < 1 {
-		panelNavX = 1
-	}
+	panelNavX := max((m.width-lipgloss.Width(panelNav))/2, 1)
 
 	layers := []*lipgloss.Layer{
 		lipgloss.NewLayer(panel).ID("panel"),
@@ -98,28 +95,10 @@ func (m mediaList) View() string {
 	return compositor.Render()
 }
 
-func (m mediaList) renderPanelNav() string {
-	segments := []struct {
-		label string
-		kind  ListKind
-	}{
-		{label: "PL", kind: Playlists},
-		{label: "TR", kind: Tracks},
-		{label: "AL", kind: Albums},
-		{label: "AR", kind: Artists},
-	}
-
-	parts := make([]string, 0, len(segments))
-	for _, segment := range segments {
-		if m.kind == segment.kind {
-			parts = append(parts, m.styles.panelNavActive.Render(segment.label))
-			continue
-		}
-		parts = append(parts, m.styles.panelNavMuted.Render(segment.label))
-	}
-
-	return m.styles.panelNav.Render(strings.Join(parts, " - "))
+func (m *mediaList) SetTitle(title string) {
+	m.list.Title = title
 }
+
 func (m *mediaList) Update(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
@@ -146,7 +125,7 @@ func (m *mediaList) StartLoading() tea.Cmd {
 func (m *mediaList) SetContent(entities []Entity, kind ListKind) tea.Cmd {
 	items := make([]list.Item, 0, len(entities))
 	for _, entity := range entities {
-		if(entity.Name == "") {
+		if entity.Name == "" {
 			continue
 		}
 		items = append(items, mediaListItem{entity: entity})
@@ -156,8 +135,15 @@ func (m *mediaList) SetContent(entities []Entity, kind ListKind) tea.Cmd {
 	setItemsCmd := m.list.SetItems(items)
 	logger.Log.Info().Any("items", entities).Int("kind", int(kind)).Msg("set content")
 	m.list.StopSpinner()
-	m.list.Title = listTitle(kind)
 	return setItemsCmd
+}
+
+func (m *mediaList) StopSpinner() {
+	m.list.StopSpinner()
+}
+
+func (m *mediaList) SetStatus(message string) tea.Cmd {
+	return m.list.NewStatusMessage(message)
 }
 
 type mediaListItem struct {
@@ -197,4 +183,34 @@ func listTitle(kind ListKind) string {
 	default:
 		return "Media"
 	}
+}
+
+func listTitleAbbr(kind ListKind) string {
+	switch kind {
+	case Albums:
+		return "AL"
+	case Artists:
+		return "AR"
+	case Playlists:
+		return "PL"
+	case Tracks:
+		return "TR"
+	case Shows:
+		return "SH"
+	case Episodes:
+		return "EP"
+	case AudioBooks:
+		return "AB"
+	default:
+		return "Media"
+	}
+}
+
+func GenerateListTitle(kinds []ListKind) string {
+	var parts []string
+	for i := range len(kinds) - 1 {
+		parts = append(parts, listTitleAbbr(kinds[i]))
+	}
+	parts = append(parts, listTitle(kinds[len(kinds)-1]))
+	return strings.Join(parts, ">")
 }

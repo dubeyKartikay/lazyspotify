@@ -48,6 +48,12 @@ type mediaLoadErrMsg struct {
 	err error
 }
 
+type playTrackErrMsg struct {
+	err error
+}
+
+type playTrackOkMsg struct{}
+
 type startupCompleteMsg struct{}
 
 type playerReadyMsg struct{}
@@ -329,6 +335,14 @@ func (m *Model) HandleMediaRequest(mediaRequest MediaRequest) tea.Cmd {
 		return m.handleGetSavedAlbums(mediaRequest.offset)
 	case GetFollowedArtists:
 		return m.handleGetFollowedArtists()
+	case GetPlaylistTracks:
+		return m.handleGetPlaylistTracks(mediaRequest.entityURI, mediaRequest.offset)
+	case GetArtistAlbums:
+		return m.handleGetArtistAlbums(mediaRequest.entityURI, mediaRequest.offset)
+	case GetAlbumTracks:
+		return m.handleGetAlbumTracks(mediaRequest.entityURI, mediaRequest.offset)
+	case PlayTrack:
+		return m.handlePlayTrack(mediaRequest.entityURI)
 	}
 	return nil
 }
@@ -390,5 +404,64 @@ func (m *Model) handleGetFollowedArtists() tea.Cmd {
 		}
 		e := AdaptSpotifyFollowedArtistsPage(p)
 		return mediaLoadedMsg{entities: e, kind: Artists}
+	}
+}
+
+func (m *Model) handleGetPlaylistTracks(uri string, offset int) tea.Cmd {
+	if m.spotifyClient == nil {
+		return nil
+	}
+
+	return func() tea.Msg {
+		tracks, err := m.spotifyClient.GetPlaylistTracks(context.Background(), uri, offset)
+		if err != nil {
+			return mediaLoadErrMsg{err: err}
+		}
+		e := AdaptSpotifyPlaylistTracks(tracks)
+		return mediaLoadedMsg{entities: e, kind: Tracks}
+	}
+}
+
+func (m *Model) handleGetArtistAlbums(uri string, offset int) tea.Cmd {
+	if m.spotifyClient == nil {
+		return nil
+	}
+
+	return func() tea.Msg {
+		albums, err := m.spotifyClient.GetArtistAlbums(context.Background(), uri, offset)
+		if err != nil {
+			return mediaLoadErrMsg{err: err}
+		}
+		e := AdaptSpotifyArtistAlbums(albums)
+		return mediaLoadedMsg{entities: e, kind: Albums}
+	}
+}
+
+func (m *Model) handleGetAlbumTracks(uri string, offset int) tea.Cmd {
+	if m.spotifyClient == nil {
+		return nil
+	}
+
+	return func() tea.Msg {
+		tracks, err := m.spotifyClient.GetAlbumTracks(context.Background(), uri, offset)
+		if err != nil {
+			return mediaLoadErrMsg{err: err}
+		}
+		e := AdaptSpotifyAlbumTracks(tracks)
+		return mediaLoadedMsg{entities: e, kind: Tracks}
+	}
+}
+
+func (m *Model) handlePlayTrack(uri string) tea.Cmd {
+	if m.player == nil {
+		return m.mediaCenter.SetStatus("Player not ready")
+	}
+
+	return func() tea.Msg {
+		err := m.player.PlayTrack(context.Background(), uri)
+		if err != nil {
+			return playTrackErrMsg{err: err}
+		}
+		return playTrackOkMsg{}
 	}
 }

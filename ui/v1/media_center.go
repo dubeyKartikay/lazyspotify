@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
+	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	"github.com/zmb3/spotify/v2"
 )
 
@@ -22,11 +23,18 @@ const (
 	GetSavedTracks
 	GetSavedAlbums
 	GetFollowedArtists
+	GetPlaylistTracks
+	GetArtistAlbums
+	GetAlbumTracks
+	PlayTrack
 )
 
 type MediaRequest struct {
-	kind   MediaRequestKind
-	offset int
+	kind        MediaRequestKind
+	offset      int
+	entityURI   string
+	append      bool
+	showLoading bool
 }
 
 func NewEntity(name string, desc string, uri string, img string) Entity {
@@ -78,44 +86,117 @@ func nextLibraryListKind(current ListKind) ListKind {
 }
 
 func MediaRequestForListKind(kind ListKind, offset int) MediaRequest {
-	return MediaRequest{kind: requestKindForListKind(kind), offset: offset}
+	return MediaRequest{kind: requestKindForListKind(kind), offset: offset, showLoading: true}
 }
 
 type MediaCenter struct {
-	visibleList    mediaList
+	lists          utils.Stack[mediaList]
 	cassettePlayer CassettePlayer
 	displayScreen  displayScreen
 }
 
 func NewMediaCenter() MediaCenter {
-	return MediaCenter{
+	m := MediaCenter{
 		cassettePlayer: NewCassettePlayer(),
-		visibleList:    newMediaList(),
 		displayScreen:  newDisplayScreen(),
 	}
+	m.lists.Push(newMediaList())
+	return m
 }
 
 func (m *MediaCenter) Update(msg tea.Msg) tea.Cmd {
-	listCmd := m.visibleList.Update(msg)
+	visibleList := m.lists.Peek()
+	listCmd := visibleList.Update(msg)
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "enter":
+			if item, ok := visibleList.list.SelectedItem().(mediaListItem); ok {
+				return item.entity.Action(m)
+			}
+		case "backspace", "delete":
+			if m.lists.Len() > 1 {
+				m.lists.Pop()
+				return m.SetStatus("Back")
+			}
+		}
+	}
+
 	return listCmd
 }
 func (m *MediaCenter) StartLoading() tea.Cmd {
-	return m.visibleList.StartLoading()
+	return m.lists.Peek().StartLoading()
 }
 
 func (m *MediaCenter) SetContent(entities []Entity, kind ListKind) tea.Cmd {
-	cmd := m.visibleList.SetContent(entities, kind)
+	visibleList := m.lists.Peek()
+	cmd := visibleList.SetContent(entities, kind)
+	kinds := make([]ListKind, 0, m.lists.Len())
+for _, list := range m.lists.Items {
+		kinds = append(kinds, list.kind)
+	}
+	visibleList.SetTitle(GenerateListTitle(kinds))
 	logger.Log.Info().Any("entities", entities).Int("kind", int(kind)).Msg("set content")
-	logger.Log.Info().Int("kind", int(m.visibleList.kind)).Msg("set content visibleList")
+	logger.Log.Info().Int("kind", int(visibleList.kind)).Msg("set content visibleList")
 	return cmd
 }
 
+func (m *MediaCenter) StopSpinner() {
+	m.lists.Peek().StopSpinner()
+}
+
+func (m *MediaCenter) SetStatus(message string) tea.Cmd {
+	return m.lists.Peek().SetStatus(message)
+}
+
 func (m *MediaCenter) NextListKind() ListKind {
-	return nextLibraryListKind(m.visibleList.kind)
+	return nextLibraryListKind(m.lists.Items[0].kind)
 }
 
 func (e *Entity) Action(m *MediaCenter) tea.Cmd {
-	return nil
+	visibleList := m.lists.Peek()
+	switch visibleList.kind {
+	case Playlists:
+		m.lists.Push(newMediaList())
+		return func() tea.Msg {
+			return MediaRequest{
+				kind:        GetPlaylistTracks,
+				offset:      0,
+				entityURI:   e.ID,
+				showLoading: true,
+			}
+		}
+	case Artists:
+		m.lists.Push(newMediaList())
+		return func() tea.Msg {
+			return MediaRequest{
+				kind:        GetArtistAlbums,
+				offset:      0,
+				entityURI:   e.ID,
+				showLoading: true,
+			}
+		}
+	case Albums:
+		m.lists.Push(newMediaList())
+		return func() tea.Msg {
+			return MediaRequest{
+				kind:        GetAlbumTracks,
+				offset:      0,
+				entityURI:   e.ID,
+				showLoading: true,
+			}
+		}
+	case Tracks:
+		return func() tea.Msg {
+			return MediaRequest{
+				kind:        PlayTrack,
+				entityURI:   e.ID,
+				showLoading: false,
+			}
+		}
+	default:
+		return nil
+	}
 }
 
 func AdaptSpotifyPlaylistPage(p *spotify.SimplePlaylistPage) []Entity {
@@ -181,6 +262,49 @@ func AdaptSpotifyFollowedArtistsPage(p *spotify.FullArtistCursorPage) []Entity {
 				desc,
 				string(artist.URI),
 				imageURL(artist.Images),
+			))
+	}
+	return entities
+}
+
+func AdaptSpotifyPlaylistTracks(tracks []spotify.FullTrack) []Entity {
+	entities := make([]Entity, 0, len(tracks))
+	for _, track := range tracks {
+		desc := strings.TrimSpace(joinArtists(track.Artists))
+		if track.Album.Name != "" {
+			if desc != "" {
+				desc += " • " + track.Album.Name
+			} else {
+				desc = track.Album.Name
+			}
+		}
+		entities = append(entities, NewEntity(track.Name, desc, string(track.URI), imageURL(track.Album.Images)))
+	}
+	return entities
+}
+
+func AdaptSpotifyArtistAlbums(albums []spotify.SimpleAlbum) []Entity {
+	entities := make([]Entity, 0, len(albums))
+	for _, album := range albums {
+		entities = append(entities,
+			NewEntity(album.Name,
+				joinArtists(album.Artists),
+				string(album.URI),
+				imageURL(album.Images),
+			))
+	}
+	return entities
+}
+
+func AdaptSpotifyAlbumTracks(tracks []spotify.SimpleTrack) []Entity {
+	entities := make([]Entity, 0, len(tracks))
+	for _, track := range tracks {
+		desc := strings.TrimSpace(joinArtists(track.Artists))
+		entities = append(entities,
+			NewEntity(track.Name,
+				desc,
+				string(track.URI),
+				"",
 			))
 	}
 	return entities
