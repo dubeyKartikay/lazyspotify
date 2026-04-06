@@ -15,11 +15,30 @@ type displayScreen struct {
 	height         int
 	defaultDisplay string
 	scrollOffset   int
+	styles         displayStyles
+}
+
+type displayStyles struct {
+	panel   lipgloss.Style
+	primary lipgloss.Style
+	accent  lipgloss.Style
+	muted   lipgloss.Style
+	marquee lipgloss.Style
 }
 
 func newDisplayScreen() displayScreen {
 	return displayScreen{
 		defaultDisplay: "Lazyspotify: The cutest terminal music player, Lazyspotify: The cutest terminal music player, Lazyspotify: The cutest terminal music player",
+		styles: displayStyles{
+			panel: lipgloss.NewStyle().
+				BorderStyle(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("30")).
+				Foreground(lipgloss.Color("229")),
+			primary: lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Bold(true),
+			accent:  lipgloss.NewStyle().Foreground(lipgloss.Color("50")),
+			muted:   lipgloss.NewStyle().Foreground(lipgloss.Color("151")),
+			marquee: lipgloss.NewStyle().Foreground(lipgloss.Color("195")).Bold(true),
+		},
 	}
 }
 
@@ -29,19 +48,28 @@ func (d *displayScreen) SetSongInfo(songInfo SongInfo) {
 
 func (d *displayScreen) View() string {
 	songInfo := d.songInfo
-	s := d.defaultDisplay
+	raw := d.defaultDisplay
+	styled := d.styles.muted.Render(raw)
 	if songInfo.title != "" {
 		separator := " • "
-		s = lipgloss.JoinHorizontal(lipgloss.Left, songInfo.title)
-		s = lipgloss.JoinHorizontal(lipgloss.Left, s, separator, songInfo.artist)
-		s = lipgloss.JoinHorizontal(lipgloss.Left, s, separator, songInfo.album)
+		raw = songInfo.title + separator + songInfo.artist + separator + songInfo.album
+		styled = lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			d.styles.primary.Render(songInfo.title),
+			d.styles.accent.Render(separator),
+			d.styles.muted.Render(songInfo.artist),
+			d.styles.accent.Render(separator),
+			d.styles.muted.Render(songInfo.album),
+		)
 	}
 
 	contentWidth := max(0, d.width-2)
 	if contentWidth > 0 {
-		s = d.scrollText(s, contentWidth)
+		if lipgloss.Width(raw) > contentWidth {
+			styled = d.styles.marquee.Render(d.scrollText(raw, contentWidth))
+		}
 	}
-	panel := lipgloss.NewStyle().Width(d.width).Height(d.height).BorderStyle(lipgloss.RoundedBorder()).Render(s)
+	panel := d.styles.panel.Width(d.width).Height(d.height).Render(styled)
 	return panel
 }
 
