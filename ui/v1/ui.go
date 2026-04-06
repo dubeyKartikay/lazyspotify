@@ -76,7 +76,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.waitForPlayerReady(), m.waitForPlayerEvent(), requestCmd, centerCmd)
 	case playerReadyMsg:
 		m.playerReady = true
-		m.playDailyMix()
 		return m, centerCmd
 	case playerReadyErrMsg:
 		m.playerReady = false
