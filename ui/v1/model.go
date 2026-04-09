@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/help"
 	tea "charm.land/bubbletea/v2"
@@ -18,29 +19,32 @@ import (
 )
 
 type Model struct {
-	authModel     *AuthModel
-	playing       bool
-	playerReady   bool
-	songInfo      SongInfo
-	volumeInfo    VolumeInfo
-	player        *player.Player
-	spotifyClient *spotify.SpotifyClient
-	mediaCenter   MediaCenter
-	width         int
-	height        int
-	help          help.Model
-	keys          appKeyMap
+	authModel          *AuthModel
+	playing            bool
+	playerReady        bool
+	songInfo           SongInfo
+	volumeInfo         VolumeInfo
+	volumeOverlayUntil time.Time
+	player             *player.Player
+	spotifyClient      *spotify.SpotifyClient
+	mediaCenter        MediaCenter
+	width              int
+	height             int
+	help               help.Model
+	keys               appKeyMap
 }
 
 type SongInfo struct {
 	title    string
 	artist   string
 	album    string
+	position int
 	duration int
 }
 
 type VolumeInfo struct {
 	volume int
+	max    int
 }
 
 type mediaLoadedMsg struct {
@@ -208,17 +212,18 @@ func (m *Model) previousCmd() tea.Cmd {
 }
 
 func (m *Model) incrementVolumeCmd() tea.Cmd {
-	return func() tea.Msg {
+	return tea.Batch(func() tea.Msg {
 		m.incrementVolume()
 		return nil
-	}
+	}, m.mediaCenter.cassettePlayer.ShowVolume())
 }
 
 func (m *Model) decrementVolumeCmd() tea.Cmd {
-	return func() tea.Msg {
+	return tea.Batch(func() tea.Msg {
 		m.decrementVolume()
+		m.mediaCenter.cassettePlayer.ShowVolume()
 		return nil
-	}
+	}, m.mediaCenter.cassettePlayer.ShowVolume())
 }
 
 func (m *Model) setSize(width, height int) {
@@ -261,7 +266,7 @@ func (m *Model) start() error {
 	m.spotifyClient, err = spotify.NewSpotifyClient(ctx, m.authModel.auth)
 	if err != nil {
 		if spotify.IsAuthError(err) {
-			m.authModel.needsAuth = true
+			m.authModel.authState = NeedsAuth
 		}
 		logger.Log.Error().Err(err).Msg("failed to create spotify client")
 		return err
@@ -270,7 +275,7 @@ func (m *Model) start() error {
 	logger.Log.Info().Str("user id", userId).Msg("got user id")
 	if err != nil {
 		if spotify.IsAuthError(err) {
-			m.authModel.needsAuth = true
+			m.authModel.authState = NeedsAuth
 		}
 		return err
 	}
@@ -278,7 +283,7 @@ func (m *Model) start() error {
 	tkn, err := auth.New().GetAuthToken(ctx)
 
 	if err != nil || tkn == nil {
-		m.authModel.needsAuth = true
+		m.authModel.authState = NeedsAuth
 		return err
 	}
 
@@ -338,6 +343,7 @@ func (m *Model) applyPlayerEvent(ev models.PlayerEvent) {
 			title:    ev.Metadata.Name,
 			artist:   artist,
 			album:    ev.Metadata.AlbumName,
+			position: ev.Metadata.Position,
 			duration: ev.Metadata.Duration,
 		}
 		m.mediaCenter.displayScreen.SetDisplayFromSong(m.songInfo)
@@ -345,20 +351,59 @@ func (m *Model) applyPlayerEvent(ev models.PlayerEvent) {
 		m.playing = true
 	case models.EventTypePaused, models.EventTypeStopped:
 		m.playing = false
+		if ev.Type == models.EventTypeStopped {
+			m.songInfo.position = 0
+		}
 	case models.EventTypeSeek:
 		if ev.Seek != nil {
+			m.songInfo.position = ev.Seek.Position
 			m.songInfo.duration = ev.Seek.Duration
 		}
 	case models.EventTypeVolume:
 		if ev.Volume != nil {
 			m.volumeInfo.volume = ev.Volume.Value
+			if ev.Volume.Max > 0 {
+				m.volumeInfo.max = ev.Volume.Max
+			}
 		}
 	}
 }
 
 func (m *Model) NextFrame() tea.Cmd {
+	m.advancePlayback(180)
 	m.mediaCenter.cassettePlayer.NextFrame(m.playing)
 	return ticker.DoTickFast()
+}
+
+func (m *Model) markVolumeOverlay() {
+	m.volumeOverlayUntil = time.Now().Add(1500 * time.Millisecond)
+}
+
+func (m *Model) previewVolume(delta int) {
+	maxVolume := m.volumeInfo.max
+	if maxVolume <= 0 {
+		maxVolume = 100
+	}
+	m.volumeInfo.volume = max(0, min(maxVolume, m.volumeInfo.volume+delta))
+}
+
+func (m *Model) advancePlayback(elapsedMs int) {
+	if !m.playing || elapsedMs <= 0 {
+		return
+	}
+	if m.songInfo.duration <= 0 {
+		return
+	}
+	m.songInfo.position = min(m.songInfo.position+elapsedMs, m.songInfo.duration)
+	m.UpdateStatus()
+}
+
+func (m *Model) UpdateStatus()  {
+	maxVolume := m.volumeInfo.max
+	if maxVolume <= 0 {
+		maxVolume = 100
+	}
+	m.mediaCenter.cassettePlayer.UpdateStatus(m.playerReady,m.playing, m.songInfo.position, m.songInfo.duration, m.volumeInfo.volume, maxVolume)
 }
 
 func (m *Model) NextButtonFrame() tea.Cmd {

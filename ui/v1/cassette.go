@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -9,6 +10,17 @@ import (
 type Cassette struct {
 	spokeLeft  Spoke
 	spokeRight Spoke
+	playerStatus cassetteStatus
+}
+
+type cassetteStatus struct {
+	Online     bool
+	Playing    bool
+	ShowVolume bool
+	CurrentMs  int
+	DurationMs int
+	Volume     int
+	VolumeMax  int
 }
 
 func NewCassette() Cassette {
@@ -23,12 +35,12 @@ func (c *Cassette) NextFrame() {
 	c.spokeRight.NextFrame()
 }
 
-func (c *Cassette) View(online bool) string {
-	compositor := lipgloss.NewCompositor(c.cassetteLayers(online)...)
+func (c *Cassette) View ()string {
+	compositor := lipgloss.NewCompositor(c.cassetteLayers()...)
 	return compositor.Render()
 }
 
-func (c *Cassette) cassetteLayers(online bool) []*lipgloss.Layer {
+func (c *Cassette) cassetteLayers() []*lipgloss.Layer {
 	leftReelRaw := c.spokeLeft.View()
 	rightReelRaw := c.spokeRight.View()
 
@@ -42,7 +54,7 @@ func (c *Cassette) cassetteLayers(online bool) []*lipgloss.Layer {
 	windowTrim := cassetteWindowTrim()
 	tapeWindow := cassetteTapeWindow()
 	writeProtect := cassetteWriteProtect()
-	statusIndicator := cassetteStatusIndicator(online)
+	statusIndicator := cassetteStatusIndicator(c.playerStatus)
 
 	// Use unstyled widths for calculations to avoid ansi quirks,
 	// though lipgloss.Width handles ansi safely.
@@ -109,15 +121,61 @@ func (c *Cassette) cassetteLayers(online bool) []*lipgloss.Layer {
 	}
 }
 
-func cassetteStatusIndicator(online bool) string {
-	if online {
+func cassetteStatusIndicator(status cassetteStatus) string {
+	if !status.Online {
+		dot := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true).Render("●")
+		text := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true).Render(" GETTING READY")
+		return dot + text
+	}
+
+	if status.ShowVolume {
+		bar := volumeBar(status.Volume, status.VolumeMax, 10)
+		text := fmt.Sprintf("[%s] %d%%", bar, volumePercent(status.Volume, status.VolumeMax))
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render(text)
+	}
+
+	if status.Playing {
+		text := lipgloss.JoinHorizontal(lipgloss.Left, formatDuration(status.CurrentMs), "/", formatDuration(status.DurationMs))
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render(text)
+	}
+
+	if status.Online {
 		dot := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render("●")
 		text := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render(" READY")
 		return dot + text
 	}
-	dot := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true).Render("●")
-	text := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true).Render(" GETTING READY")
-	return dot + text
+
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render("0:00/0:00")
+}
+
+func formatDuration(ms int) string {
+	if ms <= 0 {
+		return "0:00"
+	}
+	totalSeconds := ms / 1000
+	minutes := totalSeconds / 60
+	seconds := totalSeconds % 60
+	return fmt.Sprintf("%02d:%02d", minutes, seconds)
+}
+
+func volumePercent(volume int, maxVolume int) int {
+	if maxVolume <= 0 {
+		maxVolume = 100
+	}
+	volume = max(0, min(volume, maxVolume))
+	return int(float64(volume) * 100 / float64(maxVolume))
+}
+
+func volumeBar(volume int, maxVolume int, width int) string {
+	if maxVolume <= 0 {
+		maxVolume = 100
+	}
+	if width <= 0 {
+		width = 10
+	}
+	volume = max(0, min(volume, maxVolume))
+	filled := int(float64(volume) * float64(width) / float64(maxVolume))
+	return strings.Repeat("■", filled) + strings.Repeat("□", width-filled)
 }
 
 func cassetteShell(innerW, innerH int) string {

@@ -6,13 +6,13 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func (m *MediaCenter) View(playerReady bool) string {
-	cassette := m.cassettePlayer.View(playerReady)
+func (m *MediaCenter) View() string {
+	cassette := m.cassettePlayer.View()
 	cassetteW, cassetteH := lipgloss.Size(cassette)
 	var mediaList string
 	var listH int
 	var listW int
-	if(m.mediaListOpen) {
+	if m.mediaListOpen {
 		listW = 30
 		listH = cassetteH
 		m.mediaPanel.SetSize(listW, listH)
@@ -24,8 +24,6 @@ func (m *MediaCenter) View(playerReady bool) string {
 	shell := lipgloss.NewStyle().BorderStyle(lipgloss.HiddenBorder()).Render(v)
 	return shell
 }
-
-
 
 func outerShell(width int, height int) string {
 	lines := make([]string, 0, height+2)

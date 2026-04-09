@@ -17,9 +17,14 @@ var authKeyMap = struct {
 }{
 	CopyURL: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy url")),
 }
-
+type authState int
+const (
+	NeedsAuth authState = iota
+	Authenticating
+	Authenticated
+)
 type AuthModel struct {
-	needsAuth       bool
+	authState       authState
 	auth            *auth.Authenticator
 	authFlowUpdates chan string
 	err             error
@@ -28,11 +33,10 @@ type AuthModel struct {
 	copied          bool
 }
 
-type statusMsg string
 
 func newAuthModel() *AuthModel {
 	return &AuthModel{
-		needsAuth:       false,
+		authState:       Authenticated,
 		auth:            auth.New(),
 		authFlowUpdates: make(chan string),
 	}
@@ -48,9 +52,9 @@ func (m *AuthModel) startAuthFlow() tea.Msg {
 func (m *AuthModel) listenForAuthUpdates() tea.Msg {
 	updates := <-m.authFlowUpdates
 	if updates == "success" {
-		m.needsAuth = false
+		m.authState = Authenticated
 	}
-	return statusMsg(updates)
+	return m.authState
 }
 
 func (m *AuthModel) Init() tea.Cmd {
@@ -58,7 +62,8 @@ func (m *AuthModel) Init() tea.Cmd {
 }
 
 func (m *AuthModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.needsAuth && !m.auth.AuthServer.Started.Load() {
+	if m.authState == NeedsAuth {
+		m.authState = Authenticating
 		return m, tea.Batch(m.startAuthFlow, m.listenForAuthUpdates)
 	}
 
@@ -73,7 +78,7 @@ func (m *AuthModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case auth.AuthServerErr:
 		m.err = msg.Err
 		return m, tea.Quit
-	case statusMsg:
+	case authState:
 		return m, m.listenForAuthUpdates
 	}
 	return m, nil

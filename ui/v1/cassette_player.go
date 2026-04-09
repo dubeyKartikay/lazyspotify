@@ -1,8 +1,11 @@
 package v1
 
 import (
-	"charm.land/lipgloss/v2"
 	"strings"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/dubeyKartikay/lazyspotify/core/ticker"
 )
 
 type CassettePlayer struct {
@@ -44,8 +47,8 @@ func NewCassettePlayer() CassettePlayer {
 	}
 }
 
-func (c *CassettePlayer) View(online bool) string {
-	cassette := c.cassette.View(online)
+func (c *CassettePlayer) View() string {
+	cassette := c.cassette.View()
 	cassetteW, cassetteH := lipgloss.Width(cassette), lipgloss.Height(cassette)
 	var buttons string
 
@@ -188,4 +191,23 @@ func (p *PlayerButton) View() string {
 		lipgloss.NewLayer(iconStyle.Render(p.icon)).X(x).Y(1).ID("icon"),
 	}
 	return lipgloss.NewCompositor(layers...).Render()
+}
+
+func (c * CassettePlayer) UpdateStatus(playerReady bool ,playing bool, position int, duration int, volume int, maxVolume int) {
+	s := &c.cassette.playerStatus
+	s.Online = playerReady
+  s.Playing = playing
+	s.CurrentMs = position 
+	s.DurationMs = duration
+	s.Volume = volume
+	s.VolumeMax = maxVolume
+}
+
+func (c *CassettePlayer) ShowVolume() tea.Cmd {
+	c.cassette.playerStatus.ShowVolume = true
+	return ticker.DoTickVolume()
+}
+
+func (c *CassettePlayer) HideVolume() {
+	c.cassette.playerStatus.ShowVolume = false
 }

@@ -25,7 +25,7 @@ func setFrames() []Frame {
 
 	frame1 := top + "\n" + "/  |  \\" + "\n" + "|  o  |" + "\n" + "\\  |  /" + "\n" + bottom
 	frame2 := top + "\n" + "/   / \\" + "\n" + "|  o  |" + "\n" + "\\ /   /" + "\n" + bottom
-	frame3 := top + "\n" + "/     \\" + "\n" + "| -o- |" + "\n" + "\\     /" + "\n" + bottom
+	frame3 := top + "\n" + "/     \\" + "\n" + "|--o--|" + "\n" + "\\     /" + "\n" + bottom
 	frame4 := top + "\n" + "/ \\   \\" + "\n" + "|  o  |" + "\n" + "\\   \\ /" + "\n" + bottom
 
 	frames := []Frame{
