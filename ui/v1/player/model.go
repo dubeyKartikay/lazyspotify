@@ -52,12 +52,12 @@ func NewModel() Model {
 
 func newButtons() []button {
 	specs := []buttonSpec{
+		{kind: PreviousButton, icon: "|<"},
+		{kind: SeekBackwardButton, icon: "<<"},
 		{kind: PlayButton, icon: "|>"},
 		{kind: PauseButton, icon: "||"},
 		{kind: SeekForwardButton, icon: ">>"},
-		{kind: SeekBackwardButton, icon: "<<"},
 		{kind: NextButton, icon: ">|"},
-		{kind: PreviousButton, icon: "|<"},
 	}
 	return buildButtons(specs)
 }

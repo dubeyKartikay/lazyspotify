@@ -24,11 +24,14 @@ func (m *Model) NextButtonFrame() {
 }
 
 func (m *Model) HandleButtonPress(kind ButtonKind) tea.Cmd {
-	if int(kind) < 0 || int(kind) >= len(m.controls) {
-		return nil
+	for idx := range m.controls {
+		if m.controls[idx].kind != kind {
+			continue
+		}
+		m.controls[idx].pressed = true
+		return ticker.DoTickClick()
 	}
-	m.controls[kind].pressed = true
-	return ticker.DoTickClick()
+	return nil
 }
 
 func (m *Model) UpdateStatus(status Status) {
