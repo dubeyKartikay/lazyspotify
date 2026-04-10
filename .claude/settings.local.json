@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/user/personal/lazyspotify/ui/v1 -type f \\\\\\( -name \"*.go\" -o -name \"*.md\" \\\\\\) -exec ls -lh {} \\\\;)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(sort -k2)",
+      "Bash(xargs ls:*)",
+      "Bash(grep -n \"^type \" ui/v1/*.go)",
+      "Bash(grep -n \"Msg$\\\\|Msg struct\\\\|Msg {\" ui/v1/*.go)",
+      "Bash(head -20 ui/v1/*.go)",
+      "Bash(grep -n \"\\\\.cassettePlayer\\\\|\\\\.mediaPanel\\\\|\\\\.displayScreen\\\\|\\\\.authModel\\\\|\\\\.mediaCenter\" ui/v1/*.go)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(go build:*)"
+    ]
+  }
+}

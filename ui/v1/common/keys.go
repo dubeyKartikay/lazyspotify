@@ -5,21 +5,23 @@ import (
 )
 
 type AppKeyMap struct {
-	ToggleHelp   key.Binding
-	Quit         key.Binding
-	CycleLibrary key.Binding
-	Select       key.Binding
-	Back         key.Binding
-	NextPage     key.Binding
-	PrevPage     key.Binding
-	TogglePanel  key.Binding
-	PlayPause    key.Binding
-	SeekForward  key.Binding
-	SeekBackward key.Binding
-	NextTrack    key.Binding
-	PrevTrack    key.Binding
-	VolumeDown   key.Binding
-	VolumeUp     key.Binding
+	ToggleHelp     key.Binding
+	Quit           key.Binding
+	CycleLibrary   key.Binding
+	Search         key.Binding
+	Select         key.Binding
+	Back           key.Binding
+	NextPage       key.Binding
+	PrevPage       key.Binding
+	TogglePanel    key.Binding
+	PlayPause      key.Binding
+	SeekForward    key.Binding
+	SeekBackward   key.Binding
+	NextTrack      key.Binding
+	PrevTrack      key.Binding
+	VolumeDown     key.Binding
+	VolumeUp       key.Binding
+	MediaPanelOpen bool
 }
 
 func NewAppKeyMap() AppKeyMap {
@@ -34,7 +36,11 @@ func NewAppKeyMap() AppKeyMap {
 		),
 		CycleLibrary: key.NewBinding(
 			key.WithKeys("tab"),
-			key.WithHelp("tab", "cycle library"),
+			key.WithHelp("tab", "next panel"),
+		),
+		Search: key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "search"),
 		),
 		Select: key.NewBinding(
 			key.WithKeys("enter"),
@@ -45,12 +51,12 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithHelp("del", "back"),
 		),
 		NextPage: key.NewBinding(
-			key.WithKeys("ctrl+d"),
-			key.WithHelp("ctrl+d", "next page"),
+			key.WithKeys("right", "l", "]"),
+			key.WithHelp("right/l/]", "next page"),
 		),
 		PrevPage: key.NewBinding(
-			key.WithKeys("ctrl+u"),
-			key.WithHelp("ctrl+u", "prev page"),
+			key.WithKeys("left", "j", "["),
+			key.WithHelp("left/j/[", "prev page"),
 		),
 		TogglePanel: key.NewBinding(
 			key.WithKeys("P"),
@@ -62,11 +68,11 @@ func NewAppKeyMap() AppKeyMap {
 		),
 		SeekForward: key.NewBinding(
 			key.WithKeys("right", "l", "ctrl+f", "]"),
-			key.WithHelp("right/l", "seek +"),
+			key.WithHelp("right/l/]", "seek +"),
 		),
 		SeekBackward: key.NewBinding(
 			key.WithKeys("left", "h", "ctrl+b", "["),
-			key.WithHelp("left/h", "seek -"),
+			key.WithHelp("left/h/[", "seek -"),
 		),
 		NextTrack: key.NewBinding(
 			key.WithKeys("n", "ctrl+s"),
@@ -88,20 +94,31 @@ func NewAppKeyMap() AppKeyMap {
 }
 
 func (k AppKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.ToggleHelp}
+	bindings := []key.Binding{k.ToggleHelp, k.Quit, k.TogglePanel}
+	return bindings
 }
 
 func (k AppKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.ToggleHelp, k.Quit, k.CycleLibrary, k.Select},
-		{k.Back, k.NextPage, k.PrevPage, k.TogglePanel, k.PlayPause},
-		{k.SeekForward, k.SeekBackward, k.VolumeDown, k.VolumeUp},
-		{k.NextTrack, k.PrevTrack},
+	help := [][]key.Binding{
+		{k.ToggleHelp, k.Quit, k.TogglePanel},
 	}
+	if k.MediaPanelOpen {
+		return append(help, []key.Binding{k.CycleLibrary, k.Search, k.Select, k.Back, k.NextPage, k.PrevPage})
+	}
+	return append(help,
+		[]key.Binding{k.PlayPause, k.SeekForward, k.SeekBackward},
+		[]key.Binding{k.VolumeDown, k.VolumeUp, k.NextTrack, k.PrevTrack},
+	)
+}
+
+func (k AppKeyMap) WithMediaPanelOpen(open bool) AppKeyMap {
+	k.MediaPanelOpen = open
+	return k
 }
 
 var MediaCenterKeyMap = struct {
 	Select      key.Binding
+	Search      key.Binding
 	TogglePanel key.Binding
 	Back        key.Binding
 	NextPanel   key.Binding
@@ -109,9 +126,10 @@ var MediaCenterKeyMap = struct {
 	PrevPage    key.Binding
 }{
 	Select:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
+	Search:      key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 	TogglePanel: key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "toggle panel")),
 	Back:        key.NewBinding(key.WithKeys("backspace", "delete"), key.WithHelp("del", "back")),
 	NextPanel:   key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next panel")),
-	NextPage:    key.NewBinding(key.WithKeys("ctrl+d"), key.WithHelp("ctrl+d", "next page")),
-	PrevPage:    key.NewBinding(key.WithKeys("ctrl+u"), key.WithHelp("ctrl+u", "prev page")),
+	NextPage:    key.NewBinding(key.WithKeys("right", "l", "]"), key.WithHelp("right/l/]", "next page")),
+	PrevPage:    key.NewBinding(key.WithKeys("left", "j", "["), key.WithHelp("left/j/[", "prev page")),
 }

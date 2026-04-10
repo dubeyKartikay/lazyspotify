@@ -49,14 +49,18 @@ type mediaLoadedMsg struct {
 }
 
 type mediaLoadErrMsg struct {
-	err error
+	err     error
+	request common.MediaRequest
 }
 
 type playTrackErrMsg struct {
-	err error
+	err       error
+	panelKind common.ListKind
 }
 
-type playTrackOkMsg struct{}
+type playTrackOkMsg struct {
+	panelKind common.ListKind
+}
 type startupCompleteMsg struct{}
 type playerReadyMsg struct{}
 
@@ -82,6 +86,10 @@ func NewModel() *Model {
 		common.GetSavedTracks:     model.handleGetSavedTracks,
 		common.GetSavedAlbums:     model.handleGetSavedAlbums,
 		common.GetFollowedArtists: model.handleGetFollowedArtists,
+		common.SearchPlaylists:    model.handleSearchPlaylists,
+		common.SearchTracks:       model.handleSearchTracks,
+		common.SearchAlbums:       model.handleSearchAlbums,
+		common.SearchArtists:      model.handleSearchArtists,
 		common.GetPlaylistTracks:  model.handleGetPlaylistTracks,
 		common.GetArtistAlbums:    model.handleGetArtistAlbums,
 		common.GetAlbumTracks:     model.handleGetAlbumTracks,

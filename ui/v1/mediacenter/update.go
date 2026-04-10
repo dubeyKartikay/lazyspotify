@@ -13,6 +13,9 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 			m.mediaListOpen = !m.mediaListOpen
 			return nil
 		}
+		if !m.mediaListOpen {
+			return nil
+		}
 	}
 	return m.mediaPanel.Update(msg)
 }

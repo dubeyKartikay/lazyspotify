@@ -52,8 +52,11 @@ func (m *Model) ApplyPagination(info common.PaginationInfo, request common.Media
 		request.Page = 1
 	}
 	m.request.Kind = request.Kind
+	m.request.PanelKind = request.PanelKind
 	m.kind = common.KindForRequestKind(request.Kind)
 	m.request.EntityURI = request.EntityURI
+	m.request.ContextURI = request.ContextURI
+	m.request.Query = request.Query
 	m.request.ShowLoading = true
 
 	m.pagination.CurrentPage = request.Page
@@ -93,9 +96,12 @@ func (m *Model) NextPageRequest() (common.MediaRequest, bool) {
 	}
 	return common.MediaRequest{
 		Kind:        m.request.Kind,
+		PanelKind:   m.request.PanelKind,
 		Cursor:      m.pagination.NextCursor,
 		Page:        m.pagination.CurrentPage + 1,
 		EntityURI:   m.request.EntityURI,
+		ContextURI:  m.request.ContextURI,
+		Query:       m.request.Query,
 		ShowLoading: true,
 	}, true
 }
@@ -106,9 +112,12 @@ func (m *Model) PrevPageRequest() (common.MediaRequest, bool) {
 	}
 	return common.MediaRequest{
 		Kind:        m.request.Kind,
+		PanelKind:   m.request.PanelKind,
 		Cursor:      m.pagination.PrevCursor,
 		Page:        m.pagination.CurrentPage - 1,
 		EntityURI:   m.request.EntityURI,
+		ContextURI:  m.request.ContextURI,
+		Query:       m.request.Query,
 		ShowLoading: true,
 	}, true
 }

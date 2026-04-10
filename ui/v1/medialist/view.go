@@ -9,8 +9,7 @@ func (m Model) View() string {
 	listHeight := m.height - 2
 	footer := ""
 	if m.pager.TotalPages > 1 {
-		listHeight--
-		footer = lipgloss.NewStyle().Width(max(0, listWidth)).Align(lipgloss.Center).Foreground(lipgloss.Color("8")).Render(m.pager.View())
+		footer = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(m.pager.View())
 	}
 	if listHeight < 1 {
 		listHeight = 1
@@ -23,5 +22,10 @@ func (m Model) View() string {
 	if footer == "" {
 		return m.list.View()
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, m.list.View(), footer)
+	layers := []*lipgloss.Layer{
+		lipgloss.NewLayer(m.list.View()).ID("list"),
+		lipgloss.NewLayer(footer).X(listWidth/2 - lipgloss.Width(footer)/2).Y(listHeight - lipgloss.Height(footer)).ID("footer"),
+	}
+	composed := lipgloss.NewCompositor(layers...)
+	return composed.Render()
 }

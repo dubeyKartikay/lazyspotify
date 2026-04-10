@@ -12,19 +12,23 @@ import (
 )
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	centerCmd := m.mediaCenter.Update(msg)
 
-	if cmd, handled := m.handleShellInput(msg, centerCmd); handled {
+	if cmd, handled := m.handleShellInput(msg); handled {
 		return m, cmd
 	}
-	if cmd, handled := m.handleSystemMessages(msg, centerCmd); handled {
+	if cmd, handled := m.handleSystemMessages(msg); handled {
 		return m, cmd
 	}
+	centerCmd := m.mediaCenter.Update(msg)
 
 	if m.authModel != nil && m.authModel.State() < uiauth.Authenticated {
 		newModel, cmd := m.authModel.Update(msg)
 		m.authModel = newModel.(*uiauth.Model)
 		return m, cmd
+	}
+
+	if m.mediaCenter.IsOpen() {
+		return m, centerCmd
 	}
 
 	if cmd, handled := m.handleTransportInput(msg, centerCmd); handled {
@@ -33,24 +37,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, centerCmd
 }
 
-func (m *Model) handleShellInput(msg tea.Msg, centerCmd tea.Cmd) (tea.Cmd, bool) {
+func (m *Model) handleShellInput(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, m.keys.ToggleHelp):
 			m.help.ShowAll = !m.help.ShowAll
-			return centerCmd, true
+			return nil, true
 		case key.Matches(msg, m.keys.Quit):
 			return tea.Quit, true
 		}
 	case tea.WindowSizeMsg:
 		m.setSize(msg.Width, msg.Height)
-		return centerCmd, true
+		return nil, true
 	}
 	return nil, false
 }
 
-func (m *Model) handleSystemMessages(msg tea.Msg, centerCmd tea.Cmd) (tea.Cmd, bool) {
+func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case uiauth.State:
 		if msg == uiauth.Authenticated {
@@ -60,57 +64,57 @@ func (m *Model) handleSystemMessages(msg tea.Msg, centerCmd tea.Cmd) (tea.Cmd, b
 	case ticker.TickFastMsg:
 		m.advancePlayback(180)
 		m.mediaCenter.TickPlayer(m.playing)
-		return tea.Batch(ticker.DoTickFast(), centerCmd), true
+		return ticker.DoTickFast(), true
 	case ticker.TickMsg:
-		return tea.Batch(m.mediaCenter.TickDisplay(), centerCmd), true
+		return m.mediaCenter.TickDisplay(), true
 	case ticker.TickMsgVolume:
 		m.mediaCenter.HideVolume()
-		return centerCmd, true
+		return nil, true
 	case ticker.TickClickMsg:
 		m.mediaCenter.TickButtons()
-		return centerCmd, true
+		return nil, true
 	case common.MediaRequest:
 		var startCmd tea.Cmd
 		logger.Log.Info().Int("kind", int(msg.Kind)).Str("cursor", msg.Cursor).Int("page", msg.Page).Msg("requesting media")
 		if msg.ShowLoading {
-			startCmd = m.mediaCenter.StartLoading()
+			startCmd = m.mediaCenter.StartLoading(msg.PanelKind)
 		}
-		return tea.Batch(startCmd, m.handleMediaRequest(msg), centerCmd), true
+		return tea.Batch(startCmd, m.handleMediaRequest(msg)), true
 	case startupCompleteMsg:
 		requestCmd := tea.Cmd(func() tea.Msg {
-			return common.MediaRequestForListKind(common.Playlists)
+			return common.RootMediaRequestForListKind(common.Playlists, "")
 		})
-		return tea.Batch(m.waitForPlayerReady(), m.waitForPlayerEvent(), requestCmd, centerCmd), true
+		return tea.Batch(m.waitForPlayerReady(), m.waitForPlayerEvent(), requestCmd), true
 	case playerReadyMsg:
 		m.playerReady = true
 		m.updatePlayerStatus()
-		return centerCmd, true
+		return nil, true
 	case playerReadyErrMsg:
 		m.playerReady = false
 		m.updatePlayerStatus()
 		logger.Log.Error().Err(msg.err).Msg("failed to wait for player to be ready")
-		return centerCmd, true
+		return nil, true
 	case playerEventMsg:
 		m.applyPlayerEvent(msg.event)
 		m.updatePlayerStatus()
-		return tea.Batch(m.waitForPlayerEvent(), centerCmd), true
+		return m.waitForPlayerEvent(), true
 	case playerEventsClosedMsg:
 		logger.Log.Warn().Msg("player events stream closed")
-		return centerCmd, true
+		return nil, true
 	case mediaLoadedMsg:
-		return tea.Batch(m.mediaCenter.SetContent(msg.entities, msg.kind, msg.pagination, msg.request), centerCmd), true
+		return m.mediaCenter.SetContent(msg.entities, msg.kind, msg.pagination, msg.request), true
 	case mediaLoadErrMsg:
 		logger.Log.Error().Err(msg.err).Msg("failed to get user library")
-		m.mediaCenter.StartLoading()
-		return tea.Batch(m.mediaCenter.SetStatus("Failed to load library"), centerCmd), true
+		m.mediaCenter.StartLoading(msg.request.PanelKind)
+		return m.mediaCenter.SetStatus(msg.request.PanelKind, "Failed to load library"), true
 	case playTrackErrMsg:
-		logger.Log.Error().Err(msg.err).Msg("failed to play track")
-		return tea.Batch(m.mediaCenter.SetStatus("Failed to play track"), centerCmd), true
+		logger.Log.Error().Err(msg.err).Msg("failed to play tack")
+		return m.mediaCenter.SetStatus(msg.panelKind, "Failed to play track"), true
 	case playTrackOkMsg:
 		m.playing = true
 		m.playerReady = true
 		m.updatePlayerStatus()
-		return tea.Batch(m.mediaCenter.SetStatus("Playing"), centerCmd), true
+		return m.mediaCenter.SetStatus(msg.panelKind, "Playing"), true
 	}
 	return nil, false
 }

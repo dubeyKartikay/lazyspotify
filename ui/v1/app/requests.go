@@ -19,7 +19,7 @@ func (m *Model) handleGetUserPlaylists(request common.MediaRequest) tea.Cmd {
 		offset := decodeOffsetCursor(request.Cursor)
 		page, err := m.spotifyClient.GetUserPlaylists(context.Background(), offset)
 		if err != nil {
-			return mediaLoadErrMsg{err: err}
+			return mediaLoadErrMsg{err: err, request: request}
 		}
 		entities := adaptSpotifyPlaylists(page)
 		pagination := paginationFromOffset(offset, len(entities), int(page.Total), 10)
@@ -35,7 +35,7 @@ func (m *Model) handleGetSavedTracks(request common.MediaRequest) tea.Cmd {
 		offset := decodeOffsetCursor(request.Cursor)
 		page, err := m.spotifyClient.GetSavedTracks(context.Background(), offset)
 		if err != nil {
-			return mediaLoadErrMsg{err: err}
+			return mediaLoadErrMsg{err: err, request: request}
 		}
 		entities := adaptSpotifySavedTracks(page)
 		pagination := paginationFromOffset(offset, len(entities), int(page.Total), 10)
@@ -51,7 +51,7 @@ func (m *Model) handleGetSavedAlbums(request common.MediaRequest) tea.Cmd {
 		offset := decodeOffsetCursor(request.Cursor)
 		page, err := m.spotifyClient.GetSavedAlbums(context.Background(), offset)
 		if err != nil {
-			return mediaLoadErrMsg{err: err}
+			return mediaLoadErrMsg{err: err, request: request}
 		}
 		entities := adaptSpotifySavedAlbums(page)
 		pagination := paginationFromOffset(offset, len(entities), int(page.Total), 10)
@@ -66,10 +66,78 @@ func (m *Model) handleGetFollowedArtists(request common.MediaRequest) tea.Cmd {
 	return func() tea.Msg {
 		page, err := m.spotifyClient.GetFollowedArtists(context.Background(), request.Cursor)
 		if err != nil {
-			return mediaLoadErrMsg{err: err}
+			return mediaLoadErrMsg{err: err, request: request}
 		}
 		entities := adaptSpotifyArtists(page)
 		pagination := paginationFromCursor(request.Page, len(entities), int(page.Total), 10, page.Cursor.After)
+		return mediaLoadedMsg{entities: entities, kind: common.Artists, pagination: pagination, request: request}
+	}
+}
+
+func (m *Model) handleSearchPlaylists(request common.MediaRequest) tea.Cmd {
+	if m.spotifyClient == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		const pageSize = 10
+		offset := decodeOffsetCursor(request.Cursor)
+		page, err := m.spotifyClient.SearchPlaylists(context.Background(), request.Query, offset, pageSize)
+		if err != nil {
+			return mediaLoadErrMsg{err: err, request: request}
+		}
+		entities := adaptSpotifyPlaylists(page)
+		pagination := paginationFromOffset(offset, len(entities), int(page.Total), pageSize)
+		return mediaLoadedMsg{entities: entities, kind: common.Playlists, pagination: pagination, request: request}
+	}
+}
+
+func (m *Model) handleSearchTracks(request common.MediaRequest) tea.Cmd {
+	if m.spotifyClient == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		const pageSize = 10
+		offset := decodeOffsetCursor(request.Cursor)
+		page, err := m.spotifyClient.SearchTracks(context.Background(), request.Query, offset, pageSize)
+		if err != nil {
+			return mediaLoadErrMsg{err: err, request: request}
+		}
+		entities := adaptSpotifyTracks(page.Tracks)
+		pagination := paginationFromOffset(offset, len(entities), int(page.Total), pageSize)
+		return mediaLoadedMsg{entities: entities, kind: common.Tracks, pagination: pagination, request: request}
+	}
+}
+
+func (m *Model) handleSearchAlbums(request common.MediaRequest) tea.Cmd {
+	if m.spotifyClient == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		const pageSize = 10
+		offset := decodeOffsetCursor(request.Cursor)
+		page, err := m.spotifyClient.SearchAlbums(context.Background(), request.Query, offset, pageSize)
+		if err != nil {
+			return mediaLoadErrMsg{err: err, request: request}
+		}
+		entities := adaptSpotifyArtistAlbums(page.Albums)
+		pagination := paginationFromOffset(offset, len(entities), int(page.Total), pageSize)
+		return mediaLoadedMsg{entities: entities, kind: common.Albums, pagination: pagination, request: request}
+	}
+}
+
+func (m *Model) handleSearchArtists(request common.MediaRequest) tea.Cmd {
+	if m.spotifyClient == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		const pageSize = 10
+		offset := decodeOffsetCursor(request.Cursor)
+		page, err := m.spotifyClient.SearchArtists(context.Background(), request.Query, offset, pageSize)
+		if err != nil {
+			return mediaLoadErrMsg{err: err, request: request}
+		}
+		entities := adaptSpotifyArtistsPage(page.Artists)
+		pagination := paginationFromOffset(offset, len(entities), int(page.Total), pageSize)
 		return mediaLoadedMsg{entities: entities, kind: common.Artists, pagination: pagination, request: request}
 	}
 }
@@ -83,7 +151,7 @@ func (m *Model) handleGetPlaylistTracks(request common.MediaRequest) tea.Cmd {
 		offset := decodeOffsetCursor(request.Cursor)
 		resp, err := m.player.GetPlaylistTracks(context.Background(), request.EntityURI, offset, pageSize)
 		if err != nil {
-			return mediaLoadErrMsg{err: err}
+			return mediaLoadErrMsg{err: err, request: request}
 		}
 		entities := adaptResolvedPlaylistTracks(resp.Tracks)
 		nextCursor := ""
@@ -109,7 +177,7 @@ func (m *Model) handleGetArtistAlbums(request common.MediaRequest) tea.Cmd {
 		offset := decodeOffsetCursor(request.Cursor)
 		albums, err := m.spotifyClient.GetArtistAlbums(context.Background(), request.EntityURI, offset)
 		if err != nil {
-			return mediaLoadErrMsg{err: err}
+			return mediaLoadErrMsg{err: err, request: request}
 		}
 		entities := adaptSpotifyArtistAlbums(albums.Albums)
 		pagination := paginationFromOffset(offset, len(entities), int(albums.Total), 10)
@@ -126,7 +194,7 @@ func (m *Model) handleGetAlbumTracks(request common.MediaRequest) tea.Cmd {
 		offset := decodeOffsetCursor(request.Cursor)
 		tracks, err := m.spotifyClient.GetAlbumTracks(context.Background(), request.EntityURI, offset)
 		if err != nil {
-			return mediaLoadErrMsg{err: err}
+			return mediaLoadErrMsg{err: err, request: request}
 		}
 		entities := adaptSpotifyAlbumTracks(tracks.Tracks)
 		pagination := paginationFromOffset(offset, len(entities), int(tracks.Total), pageSize)
@@ -136,7 +204,7 @@ func (m *Model) handleGetAlbumTracks(request common.MediaRequest) tea.Cmd {
 
 func (m *Model) handlePlayTrackRequest(request common.MediaRequest) tea.Cmd {
 	if m.player == nil {
-		return m.mediaCenter.SetStatus("Player not ready")
+		return m.mediaCenter.SetStatus(request.PanelKind, "Player not ready")
 	}
 	m.mediaCenter.SetDisplay("Loading...")
 	m.playerReady = false
@@ -145,9 +213,9 @@ func (m *Model) handlePlayTrackRequest(request common.MediaRequest) tea.Cmd {
 	return func() tea.Msg {
 		err := m.player.PlayTrack(context.Background(), request.EntityURI, request.ContextURI)
 		if err != nil {
-			return playTrackErrMsg{err: err}
+			return playTrackErrMsg{err: err, panelKind: request.PanelKind}
 		}
-		return playTrackOkMsg{}
+		return playTrackOkMsg{panelKind: request.PanelKind}
 	}
 }
 
@@ -181,12 +249,30 @@ func adaptSpotifySavedAlbums(page *spotify.SavedAlbumPage) []common.Entity {
 }
 
 func adaptSpotifyArtists(page *spotify.FullArtistCursorPage) []common.Entity {
-	return common.MapSlice(page.Artists, func(artist spotify.FullArtist) common.Entity {
+	return adaptSpotifyArtistsPage(page.Artists)
+}
+
+func adaptSpotifyArtistsPage(artists []spotify.FullArtist) []common.Entity {
+	return common.MapSlice(artists, func(artist spotify.FullArtist) common.Entity {
 		desc := ""
 		if len(artist.Genres) > 0 {
 			desc = strings.Join(artist.Genres, ", ")
 		}
 		return common.NewEntity(artist.Name, desc, string(artist.URI), imageURL(artist.Images))
+	})
+}
+
+func adaptSpotifyTracks(tracks []spotify.FullTrack) []common.Entity {
+	return common.MapSlice(tracks, func(track spotify.FullTrack) common.Entity {
+		desc := strings.TrimSpace(joinArtists(track.Artists))
+		if track.Album.Name != "" {
+			if desc != "" {
+				desc += " • " + track.Album.Name
+			} else {
+				desc = track.Album.Name
+			}
+		}
+		return common.NewEntity(track.Name, desc, string(track.URI), imageURL(track.Album.Images))
 	})
 }
 

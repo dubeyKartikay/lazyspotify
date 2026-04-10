@@ -59,18 +59,22 @@ func (m *Model) HideVolume() {
 	m.player.HideVolume()
 }
 
-func (m *Model) StartLoading() tea.Cmd {
-	return m.mediaPanel.StartLoading()
+func (m *Model) StartLoading(kind common.ListKind) tea.Cmd {
+	return m.mediaPanel.StartLoading(kind)
 }
 
 func (m *Model) SetContent(entities []common.Entity, kind common.ListKind, pagination common.PaginationInfo, request common.MediaRequest) tea.Cmd {
 	return m.mediaPanel.SetContent(entities, kind, pagination, request)
 }
 
-func (m *Model) SetStatus(message string) tea.Cmd {
-	return m.mediaPanel.SetStatus(message)
+func (m *Model) SetStatus(kind common.ListKind, message string) tea.Cmd {
+	return m.mediaPanel.SetStatus(kind, message)
 }
 
 func (m *Model) CloseLibrary() {
 	m.mediaListOpen = false
+}
+
+func (m *Model) IsOpen() bool {
+	return m.mediaListOpen
 }

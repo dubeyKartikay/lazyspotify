@@ -69,7 +69,7 @@ func NewModel(kind common.ListKind) Model {
 		list:       listModel,
 		pager:      pager,
 		state:      Initialized,
-		request:    common.MediaRequest{Kind: common.RequestKindForListKind(kind), Page: 1, ShowLoading: true},
+		request:    common.RootMediaRequestForListKind(kind, ""),
 		pagination: PaginationState{CurrentPage: 1, history: []string{""}},
 	}
 }
