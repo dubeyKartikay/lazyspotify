@@ -170,7 +170,7 @@ func TestMoreInfoFollowsSelectionAndResetsScroll(t *testing.T) {
 	})
 
 	model.Update(textKey("i"))
-	model.Update(textKey("]"))
+	model.Update(ctrlKey('d'))
 	if model.infoViewport.YOffset() == 0 {
 		t.Fatal("expected viewport to scroll down")
 	}
@@ -185,7 +185,7 @@ func TestMoreInfoFollowsSelectionAndResetsScroll(t *testing.T) {
 	}
 }
 
-func TestMoreInfoBracketsScrollViewport(t *testing.T) {
+func TestMoreInfoCtrlScrollViewport(t *testing.T) {
 	model := NewModel(common.NewAppKeyMap())
 	model.SetSize(20, 12)
 	setActivePanelContent(t, &model, []common.Entity{
@@ -193,19 +193,19 @@ func TestMoreInfoBracketsScrollViewport(t *testing.T) {
 	})
 
 	model.Update(textKey("i"))
-	model.Update(textKey("]"))
+	model.Update(ctrlKey('d'))
 	downOffset := model.infoViewport.YOffset()
 	if downOffset == 0 {
 		t.Fatal("expected scroll down to move the viewport")
 	}
 
-	model.Update(textKey("["))
+	model.Update(ctrlKey('u'))
 	if got := model.infoViewport.YOffset(); got >= downOffset {
 		t.Fatalf("viewport y-offset = %d, want less than %d after scrolling up", got, downOffset)
 	}
 }
 
-func TestMoreInfoBracketsOverridePaginationButDirectionalKeysStillPaginate(t *testing.T) {
+func TestBracketsPaginateAndCtrlScrollsInfo(t *testing.T) {
 	model := NewModel(common.NewAppKeyMap())
 	model.SetSize(20, 12)
 	setActivePanelContentWithPagination(t, &model, []common.Entity{
@@ -235,15 +235,24 @@ func TestMoreInfoBracketsOverridePaginationButDirectionalKeysStillPaginate(t *te
 	model.Update(textKey("i"))
 	beforeOffset := model.infoViewport.YOffset()
 	cmd = model.Update(textKey("]"))
+	requestMsg, ok := cmd().(common.MediaRequest)
+	if !ok {
+		t.Fatalf("info-open ] returned %T, want common.MediaRequest", cmd())
+	}
+	if requestMsg.Cursor != "cursor:2" {
+		t.Fatalf("cursor = %q, want cursor:2", requestMsg.Cursor)
+	}
+
+	cmd = model.Update(ctrlKey('d'))
 	if cmd != nil {
-		t.Fatal("expected ] to scroll info, not paginate, when info mode is open")
+		t.Fatal("expected ctrl+d to scroll info, not paginate, when info mode is open")
 	}
 	if model.infoViewport.YOffset() <= beforeOffset {
-		t.Fatal("expected ] to scroll info mode down")
+		t.Fatal("expected ctrl+d to scroll info mode down")
 	}
 
 	cmd = model.Update(textKey("l"))
-	requestMsg, ok := cmd().(common.MediaRequest)
+	requestMsg, ok = cmd().(common.MediaRequest)
 	if !ok {
 		t.Fatalf("info-open l returned %T, want common.MediaRequest", cmd())
 	}
@@ -311,6 +320,10 @@ func textKey(text string) tea.KeyPressMsg {
 
 func keyCode(code rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg(tea.Key{Code: code})
+}
+
+func ctrlKey(char rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: char, Mod: tea.ModCtrl})
 }
 
 func requestForActiveList(model *Model) common.MediaRequest {

@@ -10,6 +10,8 @@ type AppKeyMap struct {
 	CycleLibrary   key.Binding
 	Search         key.Binding
 	MoreInfo       key.Binding
+	InfoScrollUp   key.Binding
+	InfoScrollDown key.Binding
 	Select         key.Binding
 	Back           key.Binding
 	NextPage       key.Binding
@@ -47,6 +49,14 @@ func NewAppKeyMap() AppKeyMap {
 		MoreInfo: key.NewBinding(
 			key.WithKeys("i"),
 			key.WithHelp("i", "more info"),
+		),
+		InfoScrollUp: key.NewBinding(
+			key.WithKeys("ctrl+u"),
+			key.WithHelp("ctrl+u", "scroll info up"),
+		),
+		InfoScrollDown: key.NewBinding(
+			key.WithKeys("ctrl+d"),
+			key.WithHelp("ctrl+d", "scroll info down"),
 		),
 		Select: key.NewBinding(
 			key.WithKeys("enter"),
@@ -115,20 +125,12 @@ func (k AppKeyMap) FullHelp() [][]key.Binding {
 				key.WithHelp("i/esc/del", "close info"),
 			)
 			scrollInfo := key.NewBinding(
-				key.WithKeys("[", "]"),
-				key.WithHelp("[/]", "scroll info"),
-			)
-			nextPage := key.NewBinding(
-				key.WithKeys("right", "l"),
-				key.WithHelp("right/l", "next page"),
-			)
-			prevPage := key.NewBinding(
-				key.WithKeys("left", "h"),
-				key.WithHelp("left/h", "prev page"),
+				key.WithKeys("ctrl+u", "ctrl+d"),
+				key.WithHelp("ctrl+u/d", "scroll info"),
 			)
 			return append(help,
 				[]key.Binding{k.CycleLibrary, k.Search, k.Select, closeInfo},
-				[]key.Binding{nextPage, prevPage, scrollInfo},
+				[]key.Binding{k.NextPage, k.PrevPage, scrollInfo},
 			)
 		}
 		return append(help, []key.Binding{k.CycleLibrary, k.Search, k.MoreInfo, k.Select, k.Back, k.NextPage, k.PrevPage})

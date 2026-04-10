@@ -18,14 +18,14 @@ func TestFullHelpSwitchesToInfoModeHelp(t *testing.T) {
 	if !hasHelpEntry(help, "i/esc/del", "close info") {
 		t.Fatal("expected full help to include close info entry")
 	}
-	if !hasHelpEntry(help, "[/]", "scroll info") {
+	if !hasHelpEntry(help, "ctrl+u/d", "scroll info") {
 		t.Fatal("expected full help to include scroll info entry")
 	}
-	if !hasHelpEntry(help, "right/l", "next page") {
-		t.Fatal("expected full help to include next page without brackets")
+	if !hasHelpEntry(help, "right/l/]", "next page") {
+		t.Fatal("expected full help to include next page with brackets")
 	}
-	if !hasHelpEntry(help, "left/h", "prev page") {
-		t.Fatal("expected full help to include prev page without brackets")
+	if !hasHelpEntry(help, "left/h/[", "prev page") {
+		t.Fatal("expected full help to include prev page with brackets")
 	}
 }
 

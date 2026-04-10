@@ -26,11 +26,11 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 			case key.Matches(msg, m.keys.Back):
 				m.closeInfo()
 				return nil
-			case msg.String() == "[":
+			case key.Matches(msg, m.keys.InfoScrollUp):
 				m.syncInfoViewportLayout()
 				m.infoViewport.PageUp()
 				return nil
-			case msg.String() == "]":
+			case key.Matches(msg, m.keys.InfoScrollDown):
 				m.syncInfoViewportLayout()
 				m.infoViewport.PageDown()
 				return nil
