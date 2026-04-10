@@ -56,6 +56,7 @@ func NewModel(kind common.ListKind) Model {
 	listModel.SetShowStatusBar(false)
 	listModel.SetShowFilter(false)
 	listModel.SetShowPagination(false)
+	listModel.DisableQuitKeybindings()
 	listModel.InfiniteScrolling = true
 	listModel.Title = common.ListTitle(kind)
 
@@ -69,7 +70,7 @@ func NewModel(kind common.ListKind) Model {
 		list:       listModel,
 		pager:      pager,
 		state:      Initialized,
-		request:    common.MediaRequest{Kind: common.RequestKindForListKind(kind), Page: 1, ShowLoading: true},
+		request:    common.RootMediaRequestForListKind(kind, ""),
 		pagination: PaginationState{CurrentPage: 1, history: []string{""}},
 	}
 }

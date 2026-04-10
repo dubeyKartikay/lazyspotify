@@ -1,5 +1,7 @@
 package common
 
+import "strings"
+
 type Entity struct {
 	Name string
 	Desc string
@@ -23,6 +25,10 @@ const (
 	GetSavedTracks
 	GetSavedAlbums
 	GetFollowedArtists
+	SearchPlaylists
+	SearchTracks
+	SearchAlbums
+	SearchArtists
 	GetPlaylistTracks
 	GetArtistAlbums
 	GetAlbumTracks
@@ -31,10 +37,12 @@ const (
 
 type MediaRequest struct {
 	Kind        MediaRequestKind
+	PanelKind   ListKind
 	Cursor      string
 	Page        int
 	EntityURI   string
 	ContextURI  string
+	Query       string
 	ShowLoading bool
 }
 
@@ -84,18 +92,46 @@ func RequestKindForListKind(kind ListKind) MediaRequestKind {
 	}
 }
 
+func SearchRequestKindForListKind(kind ListKind) MediaRequestKind {
+	switch kind {
+	case Tracks:
+		return SearchTracks
+	case Albums:
+		return SearchAlbums
+	case Artists:
+		return SearchArtists
+	default:
+		return SearchPlaylists
+	}
+}
+
 func MediaRequestForListKind(kind ListKind) MediaRequest {
-	return MediaRequest{Kind: RequestKindForListKind(kind), Page: 1, ShowLoading: true}
+	return MediaRequest{Kind: RequestKindForListKind(kind), PanelKind: kind, Page: 1, ShowLoading: true}
+}
+
+func SearchMediaRequestForListKind(kind ListKind, query string) MediaRequest {
+	query = strings.TrimSpace(query)
+	return MediaRequest{Kind: SearchRequestKindForListKind(kind), PanelKind: kind, Page: 1, Query: query, ShowLoading: true}
+}
+
+func RootMediaRequestForListKind(kind ListKind, query string) MediaRequest {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return MediaRequestForListKind(kind)
+	}
+	return SearchMediaRequestForListKind(kind, query)
 }
 
 func KindForRequestKind(kind MediaRequestKind) ListKind {
 	switch kind {
-	case GetSavedTracks, GetPlaylistTracks, GetAlbumTracks:
+	case GetSavedTracks, SearchTracks, GetPlaylistTracks, GetAlbumTracks:
 		return Tracks
-	case GetSavedAlbums, GetArtistAlbums:
+	case GetSavedAlbums, SearchAlbums, GetArtistAlbums:
 		return Albums
-	case GetFollowedArtists:
+	case GetFollowedArtists, SearchArtists:
 		return Artists
+	case SearchPlaylists:
+		return Playlists
 	default:
 		return Playlists
 	}

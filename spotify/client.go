@@ -135,6 +135,54 @@ func (s *SpotifyClient) GetAlbumTracks(ctx context.Context, uri string, offset i
 	return page, nil
 }
 
+func (s *SpotifyClient) SearchPlaylists(ctx context.Context, query string, offset int, limit int) (*spotify.SimplePlaylistPage, error) {
+	result, err := s.client.Search(ctx, query, spotify.SearchTypePlaylist, spotify.Offset(offset), spotify.Limit(limit))
+	if err != nil {
+		logger.Log.Error().Err(err).Str("query", query).Int("offset", offset).Msg("error searching playlists")
+		return nil, err
+	}
+	if result.Playlists == nil {
+		return &spotify.SimplePlaylistPage{}, nil
+	}
+	return result.Playlists, nil
+}
+
+func (s *SpotifyClient) SearchTracks(ctx context.Context, query string, offset int, limit int) (*spotify.FullTrackPage, error) {
+	result, err := s.client.Search(ctx, query, spotify.SearchTypeTrack, spotify.Offset(offset), spotify.Limit(limit))
+	if err != nil {
+		logger.Log.Error().Err(err).Str("query", query).Int("offset", offset).Msg("error searching tracks")
+		return nil, err
+	}
+	if result.Tracks == nil {
+		return &spotify.FullTrackPage{}, nil
+	}
+	return result.Tracks, nil
+}
+
+func (s *SpotifyClient) SearchAlbums(ctx context.Context, query string, offset int, limit int) (*spotify.SimpleAlbumPage, error) {
+	result, err := s.client.Search(ctx, query, spotify.SearchTypeAlbum, spotify.Offset(offset), spotify.Limit(limit))
+	if err != nil {
+		logger.Log.Error().Err(err).Str("query", query).Int("offset", offset).Msg("error searching albums")
+		return nil, err
+	}
+	if result.Albums == nil {
+		return &spotify.SimpleAlbumPage{}, nil
+	}
+	return result.Albums, nil
+}
+
+func (s *SpotifyClient) SearchArtists(ctx context.Context, query string, offset int, limit int) (*spotify.FullArtistPage, error) {
+	result, err := s.client.Search(ctx, query, spotify.SearchTypeArtist, spotify.Offset(offset), spotify.Limit(limit))
+	if err != nil {
+		logger.Log.Error().Err(err).Str("query", query).Int("offset", offset).Msg("error searching artists")
+		return nil, err
+	}
+	if result.Artists == nil {
+		return &spotify.FullArtistPage{}, nil
+	}
+	return result.Artists, nil
+}
+
 func idFromURI(uri string) (string, error) {
 	parts := strings.Split(uri, ":")
 	if len(parts) < 3 {
