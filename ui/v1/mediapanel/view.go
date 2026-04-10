@@ -11,15 +11,18 @@ func (m *Model) View() string {
 	panelShell := m.styles.panel.Width(m.width).Height(m.height).Render("")
 	panelNav := m.renderPanelNav()
 	searchLine := m.renderSearchLine()
-	listOffsetY := lipgloss.Height(panelNav) + lipgloss.Height(searchLine)
+	listOffsetY := lipgloss.Height(panelNav)
 	listHeight := max(1, m.height-listOffsetY)
 	m.activePanel().SetSize(m.width, listHeight)
 	listView := m.activePanel().View()
 	layers := []*lipgloss.Layer{
 		lipgloss.NewLayer(panelShell).ID("panel"),
 		lipgloss.NewLayer(panelNav).X(m.width/2 - lipgloss.Width(panelNav)/2).Y(0).ID("panelNav"),
-		lipgloss.NewLayer(searchLine).X(2).Y(lipgloss.Height(panelNav)).ID("search"),
 		lipgloss.NewLayer(listView).X(1).Y(listOffsetY).ID("list"),
+	}
+	if searchLine != "" {
+		searchY := max(listOffsetY, listOffsetY+listHeight-lipgloss.Height(searchLine))
+		layers = append(layers, lipgloss.NewLayer(searchLine).X(2).Y(searchY).ID("search"))
 	}
 	return lipgloss.NewCompositor(layers...).Render()
 }
@@ -47,11 +50,11 @@ func (m *Model) renderPanelNav() string {
 }
 
 func (m *Model) renderSearchLine() string {
+	if !m.searchFocused && m.searchQuery == "" {
+		return ""
+	}
 	if m.searchFocused {
 		return m.styles.searchLine.Width(max(0, m.width-4)).Render(m.searchInput.View())
-	}
-	if m.searchQuery == "" {
-		return m.styles.searchLine.Width(max(0, m.width-4)).Render(m.styles.searchPrompt.Render("/ search"))
 	}
 	return m.styles.searchLine.Width(max(0, m.width-4)).Render(m.styles.searchValue.Render("Search: " + m.searchQuery))
 }

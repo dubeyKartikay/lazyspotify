@@ -56,6 +56,7 @@ func NewModel(kind common.ListKind) Model {
 	listModel.SetShowStatusBar(false)
 	listModel.SetShowFilter(false)
 	listModel.SetShowPagination(false)
+	listModel.DisableQuitKeybindings()
 	listModel.InfiniteScrolling = true
 	listModel.Title = common.ListTitle(kind)
 

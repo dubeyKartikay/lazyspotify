@@ -75,11 +75,12 @@ type playerEventMsg struct {
 type playerEventsClosedMsg struct{}
 
 func NewModel() *Model {
+	keys := common.NewAppKeyMap()
 	model := &Model{
 		authModel:   uiauth.NewModel(),
-		mediaCenter: mediacenter.NewModel(),
+		mediaCenter: mediacenter.NewModel(keys),
 		help:        newHelpModel(),
-		keys:        common.NewAppKeyMap(),
+		keys:        keys,
 	}
 	model.requestHandlers = map[common.MediaRequestKind]func(common.MediaRequest) tea.Cmd{
 		common.GetUserPlaylists:   model.handleGetUserPlaylists,

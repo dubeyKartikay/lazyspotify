@@ -9,7 +9,7 @@ import (
 )
 
 func TestApplySearchResetsPanelsToRoot(t *testing.T) {
-	model := NewModel()
+	model := NewModel(common.NewAppKeyMap())
 	model.panels[0].lists.Push(medialist.NewModel(common.Playlists))
 	model.panels[1].lists.Push(medialist.NewModel(common.Tracks))
 
@@ -41,7 +41,7 @@ func TestApplySearchResetsPanelsToRoot(t *testing.T) {
 }
 
 func TestBackAtRootClearsSearchAndReloadsLibrary(t *testing.T) {
-	model := NewModel()
+	model := NewModel(common.NewAppKeyMap())
 	model.searchQuery = "green"
 	model.searchInput.SetValue("green")
 
@@ -70,7 +70,7 @@ func TestBackAtRootClearsSearchAndReloadsLibrary(t *testing.T) {
 }
 
 func TestBackFromNestedListDoesNotClearSearch(t *testing.T) {
-	model := NewModel()
+	model := NewModel(common.NewAppKeyMap())
 	model.searchQuery = "green"
 	model.panels[0].lists.Push(medialist.NewModel(common.Playlists))
 

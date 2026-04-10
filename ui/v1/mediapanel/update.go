@@ -15,20 +15,20 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 		if m.searchFocused {
 			return m.updateSearchInput(msg)
 		}
-		if key.Matches(msg, common.MediaCenterKeyMap.Search) {
+		if key.Matches(msg, m.keys.Search) {
 			return m.focusSearch()
 		}
-		if key.Matches(msg, common.MediaCenterKeyMap.Back) && m.activePanel().depth() == 1 {
+		if key.Matches(msg, m.keys.Back) && m.activePanel().depth() == 1 {
 			if m.searchQuery != "" {
 				return m.clearSearchAndReload()
 			}
 			return m.activePanel().SetStatus("Library")
 		}
-		if key.Matches(msg, common.MediaCenterKeyMap.NextPanel) {
+		if key.Matches(msg, m.keys.CycleLibrary) {
 			return m.activateNextPanel()
 		}
 	}
-	return m.activePanel().Update(msg)
+	return m.activePanel().Update(msg, m.keys)
 }
 
 func (m *Model) StartLoading(kind common.ListKind) tea.Cmd {
@@ -49,7 +49,11 @@ func (m *Model) activateNextPanel() tea.Cmd {
 }
 
 func (m *Model) updateSearchInput(msg tea.KeyPressMsg) tea.Cmd {
-	if key.Matches(msg, common.MediaCenterKeyMap.Select) {
+	if msg.String() == "esc" {
+		m.blurSearch()
+		return nil
+	}
+	if key.Matches(msg, m.keys.Select) {
 		return m.submitSearch()
 	}
 	var cmd tea.Cmd
@@ -61,17 +65,17 @@ func (p *panel) activeList() *medialist.Model {
 	return p.lists.Peek()
 }
 
-func (p *panel) Update(msg tea.Msg) tea.Cmd {
+func (p *panel) Update(msg tea.Msg, keys common.AppKeyMap) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
-		case key.Matches(msg, common.MediaCenterKeyMap.Select):
+		case key.Matches(msg, keys.Select):
 			cmds := []tea.Cmd{}
 			if req, ok := p.selectedAction(); ok {
 				cmds = append(cmds, func() tea.Msg { return req })
 			}
 			return tea.Batch(cmds...)
-		case key.Matches(msg, common.MediaCenterKeyMap.NextPage):
+		case key.Matches(msg, keys.NextPage):
 			cmds := []tea.Cmd{}
 			if req, ok := p.activeList().NextPageRequest(); ok {
 				cmds = append(cmds, func() tea.Msg { return req })
@@ -79,7 +83,7 @@ func (p *panel) Update(msg tea.Msg) tea.Cmd {
 				cmds = append(cmds, p.activeList().SetStatus("No next page"))
 			}
 			return tea.Batch(cmds...)
-		case key.Matches(msg, common.MediaCenterKeyMap.PrevPage):
+		case key.Matches(msg, keys.PrevPage):
 			cmds := []tea.Cmd{}
 			if req, ok := p.activeList().PrevPageRequest(); ok {
 				cmds = append(cmds, func() tea.Msg { return req })
@@ -87,7 +91,7 @@ func (p *panel) Update(msg tea.Msg) tea.Cmd {
 				cmds = append(cmds, p.activeList().SetStatus("No previous page"))
 			}
 			return tea.Batch(cmds...)
-		case key.Matches(msg, common.MediaCenterKeyMap.Back):
+		case key.Matches(msg, keys.Back):
 			cmds := []tea.Cmd{}
 			if p.lists.Len() > 1 {
 				p.lists.Pop()

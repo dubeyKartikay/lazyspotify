@@ -24,6 +24,7 @@ type styles struct {
 type Model struct {
 	panels        []panel
 	active        int
+	keys          common.AppKeyMap
 	styles        styles
 	width         int
 	height        int
@@ -39,7 +40,7 @@ type panel struct {
 	height int
 }
 
-func NewModel() Model {
+func NewModel(keys common.AppKeyMap) Model {
 	kinds := []common.ListKind{
 		common.Playlists,
 		common.Tracks,
@@ -50,6 +51,7 @@ func NewModel() Model {
 	return Model{
 		panels:      panels,
 		active:      0,
+		keys:        keys,
 		styles:      defaultStyles(),
 		searchInput: newSearchInput(),
 	}

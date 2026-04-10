@@ -13,13 +13,15 @@ type Model struct {
 	player        player.Model
 	displayScreen displayscreen.Model
 	mediaListOpen bool
+	keys          common.AppKeyMap
 }
 
-func NewModel() Model {
+func NewModel(keys common.AppKeyMap) Model {
 	return Model{
-		mediaPanel:    mediapanel.NewModel(),
+		mediaPanel:    mediapanel.NewModel(keys),
 		player:        player.NewModel(),
 		displayScreen: displayscreen.NewModel(),
+		keys:          keys,
 	}
 }
 

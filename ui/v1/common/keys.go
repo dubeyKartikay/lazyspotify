@@ -31,8 +31,8 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithHelp("?", "toggle help"),
 		),
 		Quit: key.NewBinding(
-			key.WithKeys("q", "ctrl+c", "esc"),
-			key.WithHelp("q/esc", "quit"),
+			key.WithKeys("q", "ctrl+c"),
+			key.WithHelp("q", "quit"),
 		),
 		CycleLibrary: key.NewBinding(
 			key.WithKeys("tab"),
@@ -55,8 +55,8 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithHelp("right/l/]", "next page"),
 		),
 		PrevPage: key.NewBinding(
-			key.WithKeys("left", "j", "["),
-			key.WithHelp("left/j/[", "prev page"),
+			key.WithKeys("left", "h", "["),
+			key.WithHelp("left/h/[", "prev page"),
 		),
 		TogglePanel: key.NewBinding(
 			key.WithKeys("P"),
@@ -114,22 +114,4 @@ func (k AppKeyMap) FullHelp() [][]key.Binding {
 func (k AppKeyMap) WithMediaPanelOpen(open bool) AppKeyMap {
 	k.MediaPanelOpen = open
 	return k
-}
-
-var MediaCenterKeyMap = struct {
-	Select      key.Binding
-	Search      key.Binding
-	TogglePanel key.Binding
-	Back        key.Binding
-	NextPanel   key.Binding
-	NextPage    key.Binding
-	PrevPage    key.Binding
-}{
-	Select:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
-	Search:      key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
-	TogglePanel: key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "toggle panel")),
-	Back:        key.NewBinding(key.WithKeys("backspace", "delete"), key.WithHelp("del", "back")),
-	NextPanel:   key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next panel")),
-	NextPage:    key.NewBinding(key.WithKeys("right", "l", "]"), key.WithHelp("right/l/]", "next page")),
-	PrevPage:    key.NewBinding(key.WithKeys("left", "j", "["), key.WithHelp("left/j/[", "prev page")),
 }
