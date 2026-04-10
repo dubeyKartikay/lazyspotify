@@ -20,7 +20,7 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 		}
 		if m.infoOpen {
 			switch {
-			case msg.String() == "esc":
+			case key.Matches(msg, m.keys.Cancel):
 				m.closeInfo()
 				return nil
 			case key.Matches(msg, m.keys.Back):
@@ -89,7 +89,7 @@ func (m *Model) activateNextPanel() tea.Cmd {
 }
 
 func (m *Model) updateSearchInput(msg tea.KeyPressMsg) tea.Cmd {
-	if msg.String() == "esc" {
+	if key.Matches(msg, m.keys.Cancel) {
 		m.blurSearch()
 		return nil
 	}

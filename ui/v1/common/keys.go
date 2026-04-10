@@ -9,6 +9,7 @@ type AppKeyMap struct {
 	Quit           key.Binding
 	CycleLibrary   key.Binding
 	Search         key.Binding
+	Cancel         key.Binding
 	MoreInfo       key.Binding
 	InfoScrollUp   key.Binding
 	InfoScrollDown key.Binding
@@ -45,6 +46,10 @@ func NewAppKeyMap() AppKeyMap {
 		Search: key.NewBinding(
 			key.WithKeys("/"),
 			key.WithHelp("/", "search"),
+		),
+		Cancel: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "cancel"),
 		),
 		MoreInfo: key.NewBinding(
 			key.WithKeys("i"),
