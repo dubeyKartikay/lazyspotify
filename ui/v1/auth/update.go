@@ -2,12 +2,15 @@ package auth
 
 import (
 	"context"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	coreauth "github.com/dubeyKartikay/lazyspotify/core/auth"
 	"github.com/dubeyKartikay/lazyspotify/core/utils"
 )
+
+type authQuitMsg struct{}
 
 var keyMap = struct {
 	CopyURL key.Binding
@@ -35,6 +38,13 @@ func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
+func (m *Model) quitAfterError() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(2 * time.Second)
+		return authQuitMsg{}
+	}
+}
+
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.authState == NeedsAuth {
 		m.authState = Authenticating
@@ -49,6 +59,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case coreauth.AuthServerErr:
 		m.err = msg.Err
+		return m, m.quitAfterError()
+	case authQuitMsg:
 		return m, tea.Quit
 	case State:
 		return m, m.listenForAuthUpdates

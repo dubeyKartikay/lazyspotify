@@ -162,6 +162,14 @@ func (p *Player) WaitTillReady() error {
 	return <-l.Ready
 }
 
+func (p *Player) WaitForDaemonFailure() error {
+	l, err := p.requireLibrespot()
+	if err != nil {
+		return err
+	}
+	return <-l.Deamon.RestartFailErrorChannel
+}
+
 func (p *Player) Destroy(ctx context.Context) {
 	l, err := p.requireLibrespot()
 	if err != nil {

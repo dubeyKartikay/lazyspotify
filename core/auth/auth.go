@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	"github.com/zmb3/spotify/v2"
@@ -26,7 +27,7 @@ func New() *Authenticator {
 		keyring:     NewSpotifyKeyring(),
 		authService: authService,
 		tokenKey:    utils.GetConfig().Auth.Keyring.Key,
-    oauthErrCh:  err,
+		oauthErrCh:  err,
 	}
 }
 
@@ -34,9 +35,9 @@ func (a *Authenticator) GetAuthToken(ctx context.Context) (*oauth2.Token, error)
 	tkn, err := a.keyring.GetToken(a.tokenKey)
 	if err != nil {
 		logger.Log.Error().Err(err).Msg("error getting token")
-    return nil, err
+		return nil, err
 	}
-  return tkn, nil
+	return tkn, nil
 }
 
 func (a *Authenticator) GetClient(ctx context.Context) (*spotify.Client, error) {
@@ -50,26 +51,28 @@ func (a *Authenticator) GetClient(ctx context.Context) (*spotify.Client, error) 
 func (a *Authenticator) ReAuthenticate(ctx context.Context, updates chan<- string) (*oauth2.Token, error) {
 	logger.Log.Info().Msg("authenticating with spotify")
 	severErrCh := a.AuthServer.Start()
-  defer a.AuthServer.Shutdown()
+	defer a.AuthServer.Shutdown()
 	var tkn *oauth2.Token
 	updates <- "awaiting authentication"
 	select {
-  case err := <-a.oauthErrCh:
-    return nil, err
-  case err := <-severErrCh:
-    return nil, err
+	case err := <-a.oauthErrCh:
+		return nil, err
+	case err := <-severErrCh:
+		return nil, err
 	case tkn = <-a.authService.GetTokenChannel():
-  }
-	updates <- "success"
-	err := a.saveToken(tkn)
-	if err != nil {
-		logger.Log.Error().Err(err).Msg("error saving token")
 	}
+	if tkn == nil {
+		return nil, fmt.Errorf("authentication failed: received empty token")
+	}
+	if err := a.saveToken(tkn); err != nil {
+		return nil, fmt.Errorf("failed to save authentication token: %w", err)
+	}
+	updates <- "success"
 	return tkn, nil
 }
 
 func (a *Authenticator) GetAuthURL() string {
-  return a.authService.GetAuthURL()
+	return a.authService.GetAuthURL()
 }
 
 func (a *Authenticator) saveToken(token *oauth2.Token) error {

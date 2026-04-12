@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dubeyKartikay/lazyspotify/core/deamon"
+	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	"github.com/dubeyKartikay/lazyspotify/librespot/models"
 )
@@ -20,6 +21,7 @@ type Librespot struct {
 
 func InitLibrespot(ctx context.Context, userId string, accessToken string, panicOnDaemonFailure bool) (*Librespot, error) {
 	cfg := utils.GetConfig().Librespot
+	logger.Log.Info().Str("config", fmt.Sprintf("%+v", cfg)).Msg("librespot config")
 	librespotCommand, err := utils.ResolveLibrespotDaemonCmd(cfg.Daemon.Cmd)
 	if err != nil {
 		return nil, err

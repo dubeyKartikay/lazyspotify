@@ -1,11 +1,12 @@
 package app
 
 import (
+	"fmt"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/core/ticker"
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	uiauth "github.com/dubeyKartikay/lazyspotify/ui/v1/auth"
 	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
 	"github.com/dubeyKartikay/lazyspotify/ui/v1/player"
@@ -60,9 +61,7 @@ func (m *Model) handleShellInput(msg tea.Msg) (tea.Cmd, bool) {
 func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case fatalErrMsg:
-		m.fatalErr = msg.err
-		logger.Log.Error().Err(msg.err).Msg("fatal startup error")
-		return m.quitAfterFatalError(), true
+		return m.setFatalError(msg.err), true
 	case fatalQuitMsg:
 		return tea.Quit, true
 	case uiauth.State:
@@ -93,16 +92,15 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		requestCmd := tea.Cmd(func() tea.Msg {
 			return common.RootMediaRequestForListKind(common.Playlists, "")
 		})
-		return tea.Batch(m.waitForPlayerReady(), m.waitForPlayerEvent(), requestCmd), true
+		return tea.Batch(m.waitForPlayerReady(), m.waitForPlayerEvent(), m.waitForDaemonRestartFailure(), requestCmd), true
 	case playerReadyMsg:
 		m.playerReady = true
 		m.updatePlayerStatus()
 		return nil, true
 	case playerReadyErrMsg:
-		m.playerReady = false
-		m.updatePlayerStatus()
-		logger.Log.Error().Err(msg.err).Msg("failed to wait for player to be ready")
-		return nil, true
+		return m.setFatalError(fmt.Errorf("librespot daemon did not become ready: %w", msg.err)), true
+	case daemonRestartErrMsg:
+		return m.setFatalError(fmt.Errorf("librespot daemon exited and could not be restarted: %w", msg.err)), true
 	case playerEventMsg:
 		m.applyPlayerEvent(msg.event)
 		m.updatePlayerStatus()
@@ -124,6 +122,19 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		m.playerReady = true
 		m.updatePlayerStatus()
 		return m.mediaCenter.SetStatus(msg.panelKind, "Playing"), true
+	case playPauseOkMsg:
+		m.playing = msg.playing
+		m.updatePlayerStatus()
+		return nil, true
+	case volumeChangedMsg:
+		m.volumeInfo = msg.volumeInfo
+		m.markVolumeOverlay()
+		m.updatePlayerStatus()
+		return m.mediaCenter.ShowVolume(), true
+	case transportErrMsg:
+		logger.Log.Error().Err(msg.err).Str("action", msg.action).Msg("transport action failed")
+		m.showActionError(msg.action, msg.err)
+		return nil, true
 	}
 	return nil, false
 }
@@ -136,13 +147,11 @@ func (m *Model) handleTransportInput(msg tea.Msg, centerCmd tea.Cmd) (tea.Cmd, b
 
 	switch {
 	case key.Matches(keyMsg, m.keys.PlayPause):
-		m.playing = !m.playing
 		button := player.PauseButton
-		command := m.playPauseCmd()
-		if m.playing {
+		if !m.playing {
 			button = player.PlayButton
 		}
-		return tea.Batch(m.mediaCenter.PressButton(button), command, centerCmd), true
+		return tea.Batch(m.mediaCenter.PressButton(button), m.playPauseCmd(), centerCmd), true
 	case key.Matches(keyMsg, m.keys.SeekForward):
 		return tea.Batch(m.mediaCenter.PressButton(player.SeekForwardButton), m.seekForwardCmd(), centerCmd), true
 	case key.Matches(keyMsg, m.keys.SeekBackward):
@@ -152,14 +161,8 @@ func (m *Model) handleTransportInput(msg tea.Msg, centerCmd tea.Cmd) (tea.Cmd, b
 	case key.Matches(keyMsg, m.keys.PrevTrack):
 		return tea.Batch(m.mediaCenter.PressButton(player.PreviousButton), m.previousCmd(), centerCmd), true
 	case key.Matches(keyMsg, m.keys.VolumeDown):
-		m.markVolumeOverlay()
-		m.previewVolume(-utils.GetConfig().Librespot.VolumeStep)
-		m.updatePlayerStatus()
 		return tea.Batch(m.decrementVolumeCmd(), centerCmd), true
 	case key.Matches(keyMsg, m.keys.VolumeUp):
-		m.markVolumeOverlay()
-		m.previewVolume(utils.GetConfig().Librespot.VolumeStep)
-		m.updatePlayerStatus()
 		return tea.Batch(m.incrementVolumeCmd(), centerCmd), true
 	}
 

@@ -9,7 +9,7 @@ import (
 
 func (m *Model) View() tea.View {
 	if m.err != nil {
-		return tea.NewView(fmt.Sprintf("Error: cannot start auth server: %v", m.err))
+		return tea.NewView(fmt.Sprintf("Authentication failed: %v\nExiting...", m.err))
 	}
 	if m.auth.AuthServer.Started.Load() {
 		head := lipgloss.NewStyle().Width(m.width).Foreground(lipgloss.Color("11")).MarginBottom(1).Render("Authenticating with Spotify")

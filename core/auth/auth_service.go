@@ -23,23 +23,23 @@ func NewAuthService(redirectURI string) *AuthService {
 		spotifyauth.WithScopes(
 			"ugc-image-upload",
 			"user-read-playback-state",
-      "user-modify-playback-state",
-      "user-read-currently-playing",
-      "app-remote-control",
-      "streaming",
-      "playlist-read-private",
-      "playlist-read-collaborative",
-      "playlist-modify-private",
-      "playlist-modify-public",
-      "user-follow-modify",
-      "user-follow-read",
-      "user-read-playback-position",
-      "user-top-read",
-      "user-read-recently-played",
-      "user-library-modify",
-      "user-library-read",
-      "user-read-email",
-      "user-read-private",
+			"user-modify-playback-state",
+			"user-read-currently-playing",
+			"app-remote-control",
+			"streaming",
+			"playlist-read-private",
+			"playlist-read-collaborative",
+			"playlist-modify-private",
+			"playlist-modify-public",
+			"user-follow-modify",
+			"user-follow-read",
+			"user-read-playback-position",
+			"user-top-read",
+			"user-read-recently-played",
+			"user-library-modify",
+			"user-library-read",
+			"user-read-email",
+			"user-read-private",
 		),
 		spotifyauth.WithClientID("565c1a413de9452da373f1ed3aa6afbe"),
 	)
@@ -59,9 +59,8 @@ func (a *AuthService) GetAuthURL() string {
 }
 
 func (a *AuthService) GetTokenChannel() chan *oauth2.Token {
-  return a.tknChannel
+	return a.tknChannel
 }
-
 
 func (a *AuthService) MakeOauthCallbackHandler() (func(w http.ResponseWriter, r *http.Request), chan error) {
 	errCh := make(chan error, 1)
@@ -70,11 +69,14 @@ func (a *AuthService) MakeOauthCallbackHandler() (func(w http.ResponseWriter, r 
 		if err != nil {
 			http.Error(w, "Couldn't get token", http.StatusForbidden)
 			errCh <- err
+			return
 		}
 		if st := r.FormValue("state"); st != a.authConfig.state {
 			http.NotFound(w, r)
 			errCh <- fmt.Errorf("state mismatch: %s != %s", st, a.authConfig.state)
+			return
 		}
+		_, _ = fmt.Fprintln(w, "Authentication successful. You can close this window.")
 		a.tknChannel <- tok
 	}
 	return callback, errCh

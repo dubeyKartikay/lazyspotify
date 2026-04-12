@@ -69,11 +69,28 @@ type playerReadyErrMsg struct {
 	err error
 }
 
+type daemonRestartErrMsg struct {
+	err error
+}
+
 type playerEventMsg struct {
 	event models.PlayerEvent
 }
 
 type playerEventsClosedMsg struct{}
+
+type playPauseOkMsg struct {
+	playing bool
+}
+
+type volumeChangedMsg struct {
+	volumeInfo common.VolumeInfo
+}
+
+type transportErrMsg struct {
+	err    error
+	action string
+}
 
 type fatalErrMsg struct {
 	err error
@@ -224,11 +241,43 @@ func (m *Model) waitForPlayerEvent() tea.Cmd {
 	}
 }
 
+func (m *Model) waitForDaemonRestartFailure() tea.Cmd {
+	if m.player == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		err := m.player.WaitForDaemonFailure()
+		if err != nil {
+			return daemonRestartErrMsg{err: err}
+		}
+		return nil
+	}
+}
+
 func (m *Model) quitAfterFatalError() tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(2 * time.Second)
 		return fatalQuitMsg{}
 	}
+}
+
+func (m *Model) setFatalError(err error) tea.Cmd {
+	if err == nil {
+		return nil
+	}
+	m.fatalErr = err
+	logger.Log.Error().Err(err).Msg("fatal application error")
+	return m.quitAfterFatalError()
+}
+
+func (m *Model) showActionError(action string, err error) {
+	if err == nil {
+		return
+	}
+	if action == "" {
+		action = "Error"
+	}
+	m.mediaCenter.SetDisplay(fmt.Sprintf("%s: %v", action, err))
 }
 
 func (m *Model) applyPlayerEvent(ev models.PlayerEvent) {
@@ -303,143 +352,132 @@ func (m *Model) updatePlayerStatus() {
 	})
 }
 
-func (m *Model) playPause() {
+func (m *Model) playPause() error {
 	if m.player == nil {
-		logger.Log.Error().Msg("cannot play/pause without player")
-		return
+		return fmt.Errorf("player not ready")
 	}
-	if err := m.player.PlayPause(context.Background()); err != nil {
-		logger.Log.Error().Err(err).Msg("failed to play/pause track")
-	}
+	return m.player.PlayPause(context.Background())
 }
 
-func (m *Model) seekForward() {
+func (m *Model) seekForward() error {
 	if m.player == nil {
-		logger.Log.Error().Msg("cannot seek forward without player")
-		return
+		return fmt.Errorf("player not ready")
 	}
 	step := utils.GetConfig().Librespot.SeekStepMs
-	if err := m.player.Seek(context.Background(), step, true); err != nil {
-		logger.Log.Error().Err(err).Int("seek_step_ms", step).Msg("failed to seek forward")
-	}
+	return m.player.Seek(context.Background(), step, true)
 }
 
-func (m *Model) seekBackward() {
+func (m *Model) seekBackward() error {
 	if m.player == nil {
-		logger.Log.Error().Msg("cannot seek backward without player")
-		return
+		return fmt.Errorf("player not ready")
 	}
 	step := utils.GetConfig().Librespot.SeekStepMs
-	if err := m.player.Seek(context.Background(), -step, true); err != nil {
-		logger.Log.Error().Err(err).Int("seek_step_ms", step).Msg("failed to seek backward")
-	}
+	return m.player.Seek(context.Background(), -step, true)
 }
 
-func (m *Model) next() {
+func (m *Model) next() error {
 	if m.player == nil {
-		logger.Log.Error().Msg("cannot skip to next track without player")
-		return
+		return fmt.Errorf("player not ready")
 	}
-	if err := m.player.Next(context.Background()); err != nil {
-		logger.Log.Error().Err(err).Msg("failed to skip to next track")
-	}
+	return m.player.Next(context.Background())
 }
 
-func (m *Model) previous() {
+func (m *Model) previous() error {
 	if m.player == nil {
-		logger.Log.Error().Msg("cannot skip to previous track without player")
-		return
+		return fmt.Errorf("player not ready")
 	}
-	if err := m.player.Previous(context.Background()); err != nil {
-		logger.Log.Error().Err(err).Msg("failed to skip to previous track")
-	}
+	return m.player.Previous(context.Background())
 }
 
-func (m *Model) decrementVolume() {
+func (m *Model) changeVolume(delta int) (common.VolumeInfo, error) {
 	if m.player == nil {
-		logger.Log.Error().Msg("cannot decrement volume without player")
-		return
+		return common.VolumeInfo{}, fmt.Errorf("player not ready")
 	}
 
-	step := utils.GetConfig().Librespot.VolumeStep
 	volume, err := m.player.GetVolume(context.Background())
 	if err != nil {
-		logger.Log.Error().Err(err).Msg("failed to read volume before decrement")
-		return
+		return common.VolumeInfo{}, err
 	}
 
-	target := max(volume.Value-step, 0)
+	maxVolume := volume.Max
+	if maxVolume <= 0 {
+		maxVolume = m.volumeInfo.Max
+	}
+	if maxVolume <= 0 {
+		maxVolume = 100
+	}
+
+	target := max(0, min(maxVolume, volume.Value+delta))
 	if err := m.player.SetVolume(context.Background(), target, false); err != nil {
-		logger.Log.Error().Err(err).Int("target_volume", target).Msg("failed to decrement volume")
+		return common.VolumeInfo{}, err
 	}
-}
-
-func (m *Model) incrementVolume() {
-	if m.player == nil {
-		logger.Log.Error().Msg("cannot increment volume without player")
-		return
-	}
-
-	step := utils.GetConfig().Librespot.VolumeStep
-	volume, err := m.player.GetVolume(context.Background())
-	if err != nil {
-		logger.Log.Error().Err(err).Msg("failed to read volume before increment")
-		return
-	}
-
-	target := min(volume.Value+step, volume.Max)
-	if err := m.player.SetVolume(context.Background(), target, false); err != nil {
-		logger.Log.Error().Err(err).Int("target_volume", target).Msg("failed to increment volume")
-	}
+	return common.VolumeInfo{Volume: target, Max: maxVolume}, nil
 }
 
 func (m *Model) playPauseCmd() tea.Cmd {
+	targetPlaying := !m.playing
 	return func() tea.Msg {
-		m.playPause()
-		return nil
+		if err := m.playPause(); err != nil {
+			return transportErrMsg{err: err, action: "Failed to play/pause track"}
+		}
+		return playPauseOkMsg{playing: targetPlaying}
 	}
 }
 
 func (m *Model) seekForwardCmd() tea.Cmd {
 	return func() tea.Msg {
-		m.seekForward()
+		if err := m.seekForward(); err != nil {
+			return transportErrMsg{err: err, action: "Failed to seek forward"}
+		}
 		return nil
 	}
 }
 
 func (m *Model) seekBackwardCmd() tea.Cmd {
 	return func() tea.Msg {
-		m.seekBackward()
+		if err := m.seekBackward(); err != nil {
+			return transportErrMsg{err: err, action: "Failed to seek backward"}
+		}
 		return nil
 	}
 }
 
 func (m *Model) nextCmd() tea.Cmd {
 	return func() tea.Msg {
-		m.next()
+		if err := m.next(); err != nil {
+			return transportErrMsg{err: err, action: "Failed to skip to next track"}
+		}
 		return nil
 	}
 }
 
 func (m *Model) previousCmd() tea.Cmd {
 	return func() tea.Msg {
-		m.previous()
+		if err := m.previous(); err != nil {
+			return transportErrMsg{err: err, action: "Failed to skip to previous track"}
+		}
 		return nil
 	}
 }
 
 func (m *Model) incrementVolumeCmd() tea.Cmd {
-	return tea.Batch(func() tea.Msg {
-		m.incrementVolume()
-		return nil
-	}, m.mediaCenter.ShowVolume())
+	return func() tea.Msg {
+		volumeInfo, err := m.changeVolume(utils.GetConfig().Librespot.VolumeStep)
+		if err != nil {
+			return transportErrMsg{err: err, action: "Failed to increase volume"}
+		}
+		return volumeChangedMsg{volumeInfo: volumeInfo}
+	}
 }
 
 func (m *Model) decrementVolumeCmd() tea.Cmd {
-	return tea.Batch(func() tea.Msg {
-		m.decrementVolume()
-		return nil
-	}, m.mediaCenter.ShowVolume())
+	return func() tea.Msg {
+		volumeInfo, err := m.changeVolume(-utils.GetConfig().Librespot.VolumeStep)
+		if err != nil {
+			return transportErrMsg{err: err, action: "Failed to decrease volume"}
+		}
+		return volumeChangedMsg{volumeInfo: volumeInfo}
+	}
 }
 
 func decodeOffsetCursor(cursor string) int {
