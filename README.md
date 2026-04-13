@@ -121,8 +121,6 @@ You'll have to create `config.yaml` if it's not present
 Minimal config for package installs:
 
 ```yaml
-log_level: ERROR
-
 auth:
   client_id: your_spotify_app_client_id
 ```
@@ -130,14 +128,11 @@ auth:
 Minimal config for source or manual installs:
 
 ```yaml
-log_level: ERROR
-
 auth:
   client_id: your_spotify_app_client_id
 
 librespot:
   daemon:
-    log_level: ERROR
     cmd:
       - /absolute/path/to/lazyspotify-librespot
 ```
