@@ -49,8 +49,16 @@ trap 'rm -rf "${tmpdir}"' EXIT
 tar -C "${tmpdir}" -xzf "${source_bundle}"
 bundle_root="${tmpdir}/$(source_bundle_dirname)"
 build_root="${tmpdir}/lazyspotify-$(release_version)"
+orig_tarball="${tmpdir}/lazyspotify_$(release_version).orig.tar.gz"
 mkdir -p "${build_root}"
 tar -C "${bundle_root}" -cf - . | tar -xf - -C "${build_root}"
+
+# Debian source format 3.0 (quilt) expects an adjacent orig tarball whose top-level
+# directory matches the package versioned source tree.
+tar -C "${tmpdir}" \
+  --exclude="lazyspotify-$(release_version)/debian" \
+  -czf "${orig_tarball}" \
+  "lazyspotify-$(release_version)"
 
 load_bundle_metadata "${build_root}"
 
