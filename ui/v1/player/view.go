@@ -73,11 +73,11 @@ func (b *button) View() string {
 		btnH = 3
 	)
 
-	shellColor := lipgloss.Color("8")
+	shellColor := lipgloss.BrightBlack
 	iconStyle := b.style
 	if b.pressed {
-		shellColor = lipgloss.Color("10")
-		iconStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
+		shellColor = lipgloss.BrightGreen
+		iconStyle = lipgloss.NewStyle().Foreground(lipgloss.BrightWhite).Bold(true)
 	}
 	shell := lipgloss.NewStyle().Foreground(shellColor).Render(buttonShell(btnW, btnH, b.pressed))
 	iconW := lipgloss.Width(b.icon)

@@ -12,14 +12,14 @@ func (m *Model) View() tea.View {
 		return tea.NewView(fmt.Sprintf("Authentication failed: %v\nExiting...", m.err))
 	}
 	if m.auth.AuthServer.Started.Load() {
-		head := lipgloss.NewStyle().Width(m.width).Foreground(lipgloss.Color("11")).MarginBottom(1).Render("Authenticating with Spotify")
+		head := lipgloss.NewStyle().Width(m.width).Foreground(lipgloss.BrightYellow).MarginBottom(1).Render("Authenticating with Spotify")
 		msg := lipgloss.NewStyle().Width(m.width).MarginBottom(1).Render("Please open this link in your browser")
-		styledURL := lipgloss.NewStyle().Width(m.width).Foreground(lipgloss.Color("12")).Render(m.auth.GetAuthURL())
+		styledURL := lipgloss.NewStyle().Width(m.width).Foreground(lipgloss.BrightBlue).Render(m.auth.GetAuthURL())
 		hintText := "press c to copy"
-		hintColor := lipgloss.Color("8")
+		hintColor := lipgloss.BrightBlack
 		if m.copied {
 			hintText = "✓ copied to clipboard"
-			hintColor = lipgloss.Color("10")
+			hintColor = lipgloss.BrightGreen
 		}
 		hint := lipgloss.NewStyle().Foreground(hintColor).MarginTop(3).Render(hintText)
 		return tea.NewView(lipgloss.JoinVertical(lipgloss.Left, head, msg, styledURL, hint))

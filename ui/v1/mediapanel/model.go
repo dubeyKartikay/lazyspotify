@@ -73,26 +73,26 @@ func defaultStyles() styles {
 		panel:    lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()),
 		panelNav: lipgloss.NewStyle(),
 		panelNavActive: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("14")).
+			Foreground(lipgloss.BrightCyan).
 			Bold(true),
 		panelNavMuted: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("8")),
+			Foreground(lipgloss.BrightBlack),
 		searchLine:   lipgloss.NewStyle(),
-		searchPrompt: lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
-		searchValue:  lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
+		searchPrompt: lipgloss.NewStyle().Foreground(lipgloss.BrightBlack),
+		searchValue:  lipgloss.NewStyle().Foreground(lipgloss.White),
 		infoStrip: lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderTop(true).
 			BorderLeft(false).
 			BorderRight(false).
 			BorderBottom(false).
-			BorderForeground(lipgloss.Color("8")).
+			BorderForeground(lipgloss.BrightBlack).
 			Padding(0, 1),
 		infoLabel: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("8")).
+			Foreground(lipgloss.BrightBlack).
 			Bold(true),
 		infoValue: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252")),
+			Foreground(lipgloss.White),
 	}
 }
 

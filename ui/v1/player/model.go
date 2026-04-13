@@ -66,7 +66,7 @@ func buildButtons(specs []buttonSpec) []button {
 	return commonButtons(specs, func(spec buttonSpec) button {
 		return button{
 			kind:  spec.kind,
-			style: lipgloss.NewStyle().Foreground(lipgloss.Color("14")),
+			style: lipgloss.NewStyle().Foreground(lipgloss.BrightCyan),
 			icon:  spec.icon,
 		}
 	})

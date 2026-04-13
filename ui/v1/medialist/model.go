@@ -40,17 +40,17 @@ type Model struct {
 
 func NewModel(kind common.ListKind) Model {
 	delegate := list.NewDefaultDelegate()
-	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Foreground(lipgloss.Color("252")).PaddingLeft(1)
-	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Foreground(lipgloss.Color("245")).PaddingLeft(1)
-	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("14")).Bold(true).BorderLeft(false).PaddingLeft(1)
-	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("117")).BorderLeft(false).PaddingLeft(1)
+	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Foreground(lipgloss.White).PaddingLeft(1)
+	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Foreground(lipgloss.BrightBlack).PaddingLeft(1)
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.BrightCyan).Bold(true).BorderLeft(false).PaddingLeft(1)
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Cyan).BorderLeft(false).PaddingLeft(1)
 	delegate.SetSpacing(1)
 
 	listModel := list.New(nil, delegate, 0, 0)
 	styles := listModel.Styles
 	styles.Title = styles.Title.MarginLeft(1)
 	styles.TitleBar = lipgloss.NewStyle().MarginBottom(1)
-	styles.NoItems = styles.NoItems.Foreground(lipgloss.Color("8"))
+	styles.NoItems = styles.NoItems.Foreground(lipgloss.BrightBlack)
 	listModel.Styles = styles
 	listModel.SetShowHelp(false)
 	listModel.SetShowStatusBar(false)

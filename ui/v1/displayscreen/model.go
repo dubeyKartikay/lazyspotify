@@ -26,12 +26,12 @@ func NewModel() Model {
 		styles: styles{
 			panel: lipgloss.NewStyle().
 				BorderStyle(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("30")).
-				Foreground(lipgloss.Color("229")),
-			primary: lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Bold(true),
-			accent:  lipgloss.NewStyle().Foreground(lipgloss.Color("50")),
-			muted:   lipgloss.NewStyle().Foreground(lipgloss.Color("151")),
-			marquee: lipgloss.NewStyle().Foreground(lipgloss.Color("195")).Bold(true),
+				BorderForeground(lipgloss.Cyan).
+				Foreground(lipgloss.White),
+			primary: lipgloss.NewStyle().Foreground(lipgloss.BrightYellow).Bold(true),
+			accent:  lipgloss.NewStyle().Foreground(lipgloss.BrightCyan),
+			muted:   lipgloss.NewStyle().Foreground(lipgloss.White),
+			marquee: lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Bold(true),
 		},
 	}
 }

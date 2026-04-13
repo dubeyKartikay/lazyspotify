@@ -43,7 +43,7 @@ func (c *cassette) layers() []*lipgloss.Layer {
 	leftReelRaw := c.spokeLeft.View()
 	rightReelRaw := c.spokeRight.View()
 
-	reelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("13"))
+	reelStyle := lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta)
 	leftReel := reelStyle.Render(leftReelRaw)
 	rightReel := reelStyle.Render(rightReelRaw)
 
@@ -119,21 +119,21 @@ func (c *cassette) layers() []*lipgloss.Layer {
 
 func cassetteStatusIndicator(status cassetteStatus) string {
 	if !status.Online {
-		dot := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true).Render("●")
-		text := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true).Render(" GETTING READY")
+		dot := lipgloss.NewStyle().Foreground(lipgloss.BrightYellow).Bold(true).Render("●")
+		text := lipgloss.NewStyle().Foreground(lipgloss.BrightYellow).Bold(true).Render(" GETTING READY")
 		return dot + text
 	}
 	if status.ShowVolume {
 		bar := volumeBar(status.Volume, status.VolumeMax, 10)
 		text := fmt.Sprintf("[%s] %d%%", bar, volumePercent(status.Volume, status.VolumeMax))
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render(text)
+		return lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render(text)
 	}
 	if status.Playing {
 		text := lipgloss.JoinHorizontal(lipgloss.Left, formatDuration(status.CurrentMs), "/", formatDuration(status.DurationMs))
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render(text)
+		return lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render(text)
 	}
-	dot := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render("●")
-	text := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render(" READY")
+	dot := lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render("●")
+	text := lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render(" READY")
 	return dot + text
 }
 
@@ -181,17 +181,17 @@ func cassetteShell(innerW, innerH int) string {
 		lines = append(lines, "│"+fill+"│")
 	}
 	lines = append(lines, "╰─"+strings.Repeat("═", innerW-2)+"─╯")
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render(strings.Join(lines, "\n"))
+	return lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render(strings.Join(lines, "\n"))
 }
 
 func cassetteLabel() string {
 	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("13")).
-		Background(lipgloss.Color("0")).
+		Foreground(lipgloss.BrightMagenta).
+		Background(lipgloss.Black).
 		Bold(true)
 	accentStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("11")).
-		Background(lipgloss.Color("0")).
+		Foreground(lipgloss.BrightYellow).
+		Background(lipgloss.Black).
 		Bold(true)
 	return accentStyle.Render(" ★ ") +
 		labelStyle.Render(" LAZYSPOTIFY ") +
@@ -201,7 +201,7 @@ func cassetteLabel() string {
 
 func cassetteSubtitle() string {
 	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("7")).
+		Foreground(lipgloss.White).
 		Faint(true).
 		Render("TYPE I  │  STEREO  │  SIDE A")
 }
@@ -212,7 +212,7 @@ func cassetteWindowTrim() string {
 		"║ ◎ ║ ╌╌╌╌╌╌ ║ ◎ ║",
 		"╚═══╝        ╚═══╝",
 	}
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render(strings.Join(lines, "\n"))
+	return lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render(strings.Join(lines, "\n"))
 }
 
 func cassetteTapeWindow() string {
@@ -222,17 +222,17 @@ func cassetteTapeWindow() string {
 		"│▓░      ░▓│",
 		"╰──────────╯",
 	}
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(strings.Join(lines, "\n"))
+	return lipgloss.NewStyle().Foreground(lipgloss.Yellow).Render(strings.Join(lines, "\n"))
 }
 
 func cassetteWriteProtect() string {
-	badgeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true)
-	bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	badgeStyle := lipgloss.NewStyle().Foreground(lipgloss.BrightYellow).Bold(true)
+	bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.BrightBlack)
 	return bracketStyle.Render("⟦ ") + badgeStyle.Render("CHROME") + bracketStyle.Render(" · IEC II ⟧")
 }
 
 func cassetteScrew() string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Render("x")
+	return lipgloss.NewStyle().Foreground(lipgloss.BrightWhite).Render("x")
 }
 
 func maxInt(values ...int) int {

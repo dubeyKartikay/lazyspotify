@@ -8,11 +8,11 @@ import (
 )
 
 func (m *Model) View() tea.View {
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.BrightBlack)
 	if m.fatalErr != nil {
-		title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("9")).Render("Error")
+		title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.BrightRed).Render("Error")
 		message := lipgloss.NewStyle().MarginTop(1).Align(lipgloss.Center).Render(fmt.Sprintf("%v", m.fatalErr))
-		hint := lipgloss.NewStyle().MarginTop(1).Foreground(lipgloss.Color("8")).Render("Exiting...")
+		hint := lipgloss.NewStyle().MarginTop(1).Foreground(lipgloss.BrightBlack).Render("Exiting...")
 		content := lipgloss.JoinVertical(lipgloss.Center, title, message, hint)
 		view := lipgloss.NewStyle().Width(m.width).Height(m.height).Align(lipgloss.Center, lipgloss.Center).Render(content)
 		return tea.NewView(view)
