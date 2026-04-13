@@ -6,7 +6,7 @@
 [![Build RPM Package](https://github.com/dubeyKartikay/lazyspotify/actions/workflows/build-rpm.yml/badge.svg)](https://github.com/dubeyKartikay/lazyspotify/actions/workflows/build-rpm.yml)
 [![License](https://img.shields.io/github/license/dubeyKartikay/lazyspotify)](LICENSE)
 
-`lazyspotify` is a terminal Spotify client backed by a patched `go-librespot` daemon for playback.
+`lazyspotify` is a cute terminal Spotify client.
 
 ## Requirements
 
@@ -191,4 +191,3 @@ make run
 go test ./...
 ```
 
-Packaging and release-maintainer details live in [docs/distribution.md](docs/distribution.md).
