@@ -2,6 +2,6 @@
 # publish source bundles when the daemon is pinned only by commit.
 lazyspotify_version: "0.1.0"
 daemon_repo: "https://github.com/dubeyKartikay/go-librespot.git"
-daemon_tag: ""
+daemon_tag: "v0.7.1.1"
 daemon_commit: "4292571a38a1bca4ba1a92a334bc907c6c0a3549"
 bundle_version: "1"
