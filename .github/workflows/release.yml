@@ -197,8 +197,19 @@ jobs:
           mkdir -p bundle
           tar -C bundle -xzf "dist/${{ needs.prepare.outputs.source_bundle_name }}"
 
+      - name: Detect Apple signing configuration
+        id: apple_signing
+        env:
+          APPLE_DEVELOPER_ID_APP_CERT_B64: ${{ secrets.APPLE_DEVELOPER_ID_APP_CERT_B64 }}
+        run: |
+          if [[ -n "${APPLE_DEVELOPER_ID_APP_CERT_B64}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Prepare signing identity
-        if: ${{ secrets.APPLE_DEVELOPER_ID_APP_CERT_B64 != '' }}
+        if: ${{ steps.apple_signing.outputs.enabled == 'true' }}
         run: |
           echo "${{ secrets.APPLE_DEVELOPER_ID_APP_CERT_B64 }}" | base64 --decode > certificate.p12
           security create-keychain -p "" build.keychain
@@ -207,8 +218,23 @@ jobs:
           security import certificate.p12 -k build.keychain -P "${{ secrets.APPLE_DEVELOPER_ID_APP_CERT_PASSWORD }}" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
 
+      - name: Detect Apple notarization configuration
+        id: apple_notary
+        env:
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_TEAM_ID: ${{ secrets.APPLE_NOTARY_TEAM_ID }}
+          APPLE_NOTARY_APP_PASSWORD: ${{ secrets.APPLE_NOTARY_APP_PASSWORD }}
+        run: |
+          if [[ -n "${APPLE_NOTARY_APPLE_ID}" && -n "${APPLE_NOTARY_TEAM_ID}" && -n "${APPLE_NOTARY_APP_PASSWORD}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "profile=lazyspotify-notary" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "profile=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configure notary profile
-        if: ${{ secrets.APPLE_NOTARY_APPLE_ID != '' && secrets.APPLE_NOTARY_TEAM_ID != '' && secrets.APPLE_NOTARY_APP_PASSWORD != '' }}
+        if: ${{ steps.apple_notary.outputs.enabled == 'true' }}
         run: |
           xcrun notarytool store-credentials lazyspotify-notary \
             --apple-id "${{ secrets.APPLE_NOTARY_APPLE_ID }}" \
@@ -218,7 +244,7 @@ jobs:
       - name: Build signed macOS archive
         env:
           MACOS_CODESIGN_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_APP_CERT_COMMON_NAME }}
-          MACOS_NOTARY_PROFILE: ${{ secrets.APPLE_NOTARY_APPLE_ID != '' && secrets.APPLE_NOTARY_TEAM_ID != '' && secrets.APPLE_NOTARY_APP_PASSWORD != '' && 'lazyspotify-notary' || '' }}
+          MACOS_NOTARY_PROFILE: ${{ steps.apple_notary.outputs.profile }}
         run: |
           scripts/release/build-macos-archive.sh \
             --source-dir "bundle/${{ needs.prepare.outputs.source_bundle_dir }}" \
@@ -260,25 +286,39 @@ jobs:
     needs:
       - prepare
       - draft-release
-    if: ${{ secrets.HOMEBREW_TAP_REPO_TOKEN != '' }}
     runs-on: macos-14
 
     steps:
+      - name: Detect Homebrew tap token
+        id: homebrew_gate
+        env:
+          HOMEBREW_TAP_REPO_TOKEN: ${{ secrets.HOMEBREW_TAP_REPO_TOKEN }}
+        run: |
+          if [[ -n "${HOMEBREW_TAP_REPO_TOKEN}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout source repo
+        if: ${{ steps.homebrew_gate.outputs.enabled == 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up Go
+        if: ${{ steps.homebrew_gate.outputs.enabled == 'true' }}
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
       - name: Download source bundle
+        if: ${{ steps.homebrew_gate.outputs.enabled == 'true' }}
         uses: actions/download-artifact@v4
         with:
           name: source-bundle
           path: dist
 
       - name: Render formula
+        if: ${{ steps.homebrew_gate.outputs.enabled == 'true' }}
         run: |
           scripts/release/render-homebrew-formula.sh \
             --source-bundle "dist/${{ needs.prepare.outputs.source_bundle_name }}" \
@@ -287,6 +327,7 @@ jobs:
             --output rendered/lazyspotify.rb
 
       - name: Checkout tap repo
+        if: ${{ steps.homebrew_gate.outputs.enabled == 'true' }}
         uses: actions/checkout@v4
         with:
           repository: dubeyKartikay/homebrew-lazyspotify
@@ -294,6 +335,7 @@ jobs:
           path: tap-repo
 
       - name: Push formula update
+        if: ${{ steps.homebrew_gate.outputs.enabled == 'true' }}
         run: |
           mkdir -p tap-repo/Formula
           cp rendered/lazyspotify.rb tap-repo/Formula/lazyspotify.rb
@@ -311,20 +353,33 @@ jobs:
     needs:
       - prepare
       - draft-release
-    if: ${{ secrets.AUR_SSH_PRIVATE_KEY != '' }}
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Detect AUR SSH key
+        id: aur_gate
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [[ -n "${AUR_SSH_PRIVATE_KEY}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout source repo
+        if: ${{ steps.aur_gate.outputs.enabled == 'true' }}
         uses: actions/checkout@v4
 
       - name: Download Linux artifacts
+        if: ${{ steps.aur_gate.outputs.enabled == 'true' }}
         uses: actions/download-artifact@v4
         with:
           name: linux-artifacts
           path: dist
 
       - name: Render AUR metadata
+        if: ${{ steps.aur_gate.outputs.enabled == 'true' }}
         run: |
           scripts/release/render-aur-metadata.sh \
             --archive "dist/lazyspotify-v${{ needs.prepare.outputs.release_version }}-arch-amd64.tar.gz" \
@@ -332,6 +387,7 @@ jobs:
             --srcinfo-output rendered/.SRCINFO
 
       - name: Configure SSH key
+        if: ${{ steps.aur_gate.outputs.enabled == 'true' }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
@@ -339,6 +395,7 @@ jobs:
           ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
 
       - name: Push AUR update
+        if: ${{ steps.aur_gate.outputs.enabled == 'true' }}
         run: |
           git clone ssh://aur@aur.archlinux.org/lazyspotify-bin.git aur-repo
           cp rendered/PKGBUILD aur-repo/PKGBUILD
@@ -357,22 +414,36 @@ jobs:
     needs:
       - draft-release
       - build-linux
-    if: ${{ secrets.LAUNCHPAD_PPA != '' && secrets.LAUNCHPAD_GPG_PRIVATE_KEY != '' }}
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Detect Launchpad configuration
+        id: ppa_gate
+        env:
+          LAUNCHPAD_PPA: ${{ secrets.LAUNCHPAD_PPA }}
+          LAUNCHPAD_GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
+        run: |
+          if [[ -n "${LAUNCHPAD_PPA}" && -n "${LAUNCHPAD_GPG_PRIVATE_KEY}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install upload dependencies
+        if: ${{ steps.ppa_gate.outputs.enabled == 'true' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y dput devscripts gnupg
 
       - name: Download Linux artifacts
+        if: ${{ steps.ppa_gate.outputs.enabled == 'true' }}
         uses: actions/download-artifact@v4
         with:
           name: linux-artifacts
           path: dist
 
       - name: Import Launchpad signing key
+        if: ${{ steps.ppa_gate.outputs.enabled == 'true' }}
         run: |
           install -m 700 -d ~/.gnupg
           printf 'pinentry-mode loopback\n' > ~/.gnupg/gpg.conf
@@ -380,6 +451,7 @@ jobs:
             gpg --batch --pinentry-mode loopback --passphrase "${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}" --import
 
       - name: Configure dput
+        if: ${{ steps.ppa_gate.outputs.enabled == 'true' }}
         run: |
           cat > ~/.dput.cf <<EOF
           [lazyspotify-ppa]
@@ -391,6 +463,7 @@ jobs:
           EOF
 
       - name: Sign and upload source package
+        if: ${{ steps.ppa_gate.outputs.enabled == 'true' }}
         run: |
           changes_file="$(find dist -maxdepth 1 -name '*source.changes' | head -n 1)"
           if [[ -z "${changes_file}" ]]; then
@@ -403,28 +476,43 @@ jobs:
     needs:
       - draft-release
       - build-rpm
-    if: ${{ secrets.COPR_CONFIG != '' && secrets.COPR_PROJECT != '' }}
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Detect COPR configuration
+        id: copr_gate
+        env:
+          COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+          COPR_PROJECT: ${{ secrets.COPR_PROJECT }}
+        run: |
+          if [[ -n "${COPR_CONFIG}" && -n "${COPR_PROJECT}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install copr-cli
+        if: ${{ steps.copr_gate.outputs.enabled == 'true' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y copr-cli
 
       - name: Configure COPR
+        if: ${{ steps.copr_gate.outputs.enabled == 'true' }}
         run: |
           install -m 700 -d ~/.config
           printf '%s\n' "${{ secrets.COPR_CONFIG }}" > ~/.config/copr
           chmod 600 ~/.config/copr
 
       - name: Download RPM artifacts
+        if: ${{ steps.copr_gate.outputs.enabled == 'true' }}
         uses: actions/download-artifact@v4
         with:
           name: rpm-artifacts
           path: dist
 
       - name: Submit source RPM to COPR
+        if: ${{ steps.copr_gate.outputs.enabled == 'true' }}
         run: |
           copr-cli build "${{ secrets.COPR_PROJECT }}" "$(find dist -maxdepth 1 -name '*.src.rpm' | head -n 1)"
 
