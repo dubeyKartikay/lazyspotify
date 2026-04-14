@@ -66,6 +66,13 @@
 - Setting `LAUNCHPAD_PPA` to only the Launchpad username produces an invalid
   upload target and Launchpad rejects the upload.
 
+## Ubuntu series
+
+- The release workflow currently publishes Launchpad source packages for
+  `noble` (Ubuntu 24.04 LTS) and `questing` (Ubuntu 25.10).
+- Each series is built and uploaded separately so the PPA receives a
+  series-specific source version such as `...~noble1` or `...~questing1`.
+
 ## Arch packaging
 
 - `lazyspotify-vX.Y.Z-arch-amd64.tar.gz` must be built in an Arch environment.

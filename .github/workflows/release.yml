@@ -54,7 +54,13 @@ jobs:
 
   build-linux:
     needs: prepare
+    strategy:
+      matrix:
+        include:
+          - series: noble
+          - series: questing
     runs-on: ubuntu-24.04
+    name: build-linux (${{ matrix.series }})
 
     steps:
       - name: Checkout
@@ -92,14 +98,14 @@ jobs:
         run: |
           scripts/release/build-deb.sh \
             --source-bundle "dist/${{ needs.prepare.outputs.source_bundle_name }}" \
-            --series noble \
+            --series "${{ matrix.series }}" \
             --build-mode both \
             --output-dir dist
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-artifacts
+          name: linux-artifacts-${{ matrix.series }}
           path: |
             dist/*.deb
             dist/*.changes
@@ -498,7 +504,8 @@ jobs:
         if: ${{ steps.ppa_gate.outputs.enabled == 'true' }}
         uses: actions/download-artifact@v4
         with:
-          name: linux-artifacts
+          pattern: linux-artifacts-*
+          merge-multiple: true
           path: dist
 
       - name: Import Launchpad signing key
@@ -519,12 +526,16 @@ jobs:
             exit 1
           fi
 
-          changes_file="$(find dist -maxdepth 1 -name '*source.changes' | head -n 1)"
-          if [[ -z "${changes_file}" ]]; then
-            changes_file="$(find dist -maxdepth 1 -name '*.changes' | head -n 1)"
+          mapfile -t changes_files < <(find dist -maxdepth 1 -name '*source.changes' | sort)
+          if [[ "${#changes_files[@]}" -eq 0 ]]; then
+            echo "No source package .changes files were found in dist/." >&2
+            exit 1
           fi
-          debsign -k"${{ secrets.LAUNCHPAD_GPG_KEY_ID }}" -p"gpg --batch --pinentry-mode loopback --passphrase ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}" "${changes_file}"
-          dput "ppa:${LAUNCHPAD_PPA}" "${changes_file}"
+
+          for changes_file in "${changes_files[@]}"; do
+            debsign -k"${{ secrets.LAUNCHPAD_GPG_KEY_ID }}" -p"gpg --batch --pinentry-mode loopback --passphrase ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}" "${changes_file}"
+            dput "ppa:${LAUNCHPAD_PPA}" "${changes_file}"
+          done
 
   submit-copr:
     needs:
