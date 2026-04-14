@@ -480,8 +480,9 @@ jobs:
         env:
           LAUNCHPAD_PPA: ${{ secrets.LAUNCHPAD_PPA }}
           LAUNCHPAD_GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
+          LAUNCHPAD_GPG_KEY_ID: ${{ secrets.LAUNCHPAD_GPG_KEY_ID }}
         run: |
-          if [[ -n "${LAUNCHPAD_PPA}" && -n "${LAUNCHPAD_GPG_PRIVATE_KEY}" ]]; then
+          if [[ -n "${LAUNCHPAD_PPA}" && -n "${LAUNCHPAD_GPG_PRIVATE_KEY}" && -n "${LAUNCHPAD_GPG_KEY_ID}" ]]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
@@ -527,7 +528,7 @@ jobs:
           if [[ -z "${changes_file}" ]]; then
             changes_file="$(find dist -maxdepth 1 -name '*.changes' | head -n 1)"
           fi
-          debsign -p"gpg --batch --pinentry-mode loopback --passphrase ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}" "${changes_file}"
+          debsign -k"${{ secrets.LAUNCHPAD_GPG_KEY_ID }}" -p"gpg --batch --pinentry-mode loopback --passphrase ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}" "${changes_file}"
           dput lazyspotify-ppa "${changes_file}"
 
   submit-copr:
