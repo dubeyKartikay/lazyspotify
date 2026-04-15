@@ -1,0 +1,74 @@
+name: Bug report
+description: Report a reproducible problem in lazyspotify
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please fill out the details below so the issue can be reproduced.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: A clear and concise description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps needed to trigger the issue.
+      placeholder: |
+        1. Start lazyspotify
+        2. Open ...
+        3. Press ...
+        4. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant logs, terminal output, or screenshots if available. App logs are available in the lazyspotify config directory.
+      placeholder: |
+        macOS: ~/Library/Application Support/lazyspotify/
+        Linux: ~/.config/lazyspotify/
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: lazyspotify version
+      description: Output of `lazyspotify version`, release tag, or commit SHA.
+      placeholder: v0.0.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.4 / Ubuntu 24.04 / Fedora 41
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config
+      description: Share only the relevant config, and remove secrets before posting.
+      render: yaml

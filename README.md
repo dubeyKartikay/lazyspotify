@@ -206,3 +206,9 @@ lazyspotify version
 make run
 go test ./...
 ```
+
+## Community
+
+- [Code of Conduct](./.github/CODE_OF_CONDUCT.md)
+- [Contributing Guide](./.github/CONTRIBUTING.md)
+- [Security Policy](./.github/SECURITY.md)
