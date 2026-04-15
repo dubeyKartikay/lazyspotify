@@ -149,7 +149,7 @@ func formatDuration(ms int) string {
 
 func volumePercent(volume, maxVolume int) int {
 	if maxVolume <= 0 {
-		maxVolume = 100
+		maxVolume = 65535
 	}
 	volume = max(0, min(volume, maxVolume))
 	return int(float64(volume) * 100 / float64(maxVolume))
@@ -157,7 +157,7 @@ func volumePercent(volume, maxVolume int) int {
 
 func volumeBar(volume, maxVolume, width int) string {
 	if maxVolume <= 0 {
-		maxVolume = 100
+		maxVolume = 65535
 	}
 	if width <= 0 {
 		width = 10

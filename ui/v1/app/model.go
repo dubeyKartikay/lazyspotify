@@ -324,7 +324,7 @@ func (m *Model) markVolumeOverlay() {
 func (m *Model) previewVolume(delta int) {
 	maxVolume := m.volumeInfo.Max
 	if maxVolume <= 0 {
-		maxVolume = 100
+		maxVolume = 65535
 	}
 	m.volumeInfo.Volume = max(0, min(maxVolume, m.volumeInfo.Volume+delta))
 }
@@ -340,7 +340,7 @@ func (m *Model) advancePlayback(elapsedMs int) {
 func (m *Model) updatePlayerStatus() {
 	maxVolume := m.volumeInfo.Max
 	if maxVolume <= 0 {
-		maxVolume = 100
+		maxVolume = 65535
 	}
 	m.mediaCenter.UpdatePlayerStatus(player.Status{
 		PlayerReady: m.playerReady,
@@ -404,7 +404,7 @@ func (m *Model) changeVolume(delta int) (common.VolumeInfo, error) {
 		maxVolume = m.volumeInfo.Max
 	}
 	if maxVolume <= 0 {
-		maxVolume = 100
+		maxVolume = 65535
 	}
 
 	target := max(0, min(maxVolume, volume.Value+delta))
