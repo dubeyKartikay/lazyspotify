@@ -14,6 +14,7 @@ import (
 type LibrespotConfig struct {
 	LogLevel        string `yaml:"log_level"`
 	ZeroconfEnabled bool   `yaml:"zeroconf_enabled"`
+	MprisEnabled    bool   `yaml:"mpris_enabled"`
 	AudioBackend    string `yaml:"audio_backend"`
 	DeviceName      string `yaml:"device_name"`
 	Credentials     struct {
@@ -59,6 +60,7 @@ func makeLibrespotConfig(cfg utils.AppConfig, userId string, accessToken string)
 
 	librespotConfig.LogLevel = daemonLogLevel(cfg.Librespot.Daemon.LogLevel)
 	librespotConfig.ZeroconfEnabled = cfg.Librespot.Daemon.ZeroconfEnabled
+	librespotConfig.MprisEnabled = mprisEnabledForOS(runtime.GOOS)
 	librespotConfig.AudioBackend = getAudioBackend()
 	librespotConfig.DeviceName = "lazyspotify"
 	librespotConfig.Credentials.Type = "spotify_token"
@@ -83,6 +85,10 @@ func daemonLogLevel(raw string) string {
 
 func getAudioBackend() string {
 	return audioBackendForOS(runtime.GOOS)
+}
+
+func mprisEnabledForOS(goos string) bool {
+	return true
 }
 
 func audioBackendForOS(goos string) string {
