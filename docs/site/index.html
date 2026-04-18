@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>★ LAZYSPOTIFY ── SIDE A · v0.3.2 ★</title>
+<meta name="description" content="lazyspotify — a terminal Spotify client shaped like a cassette deck." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    /* Tokyo Night — tuned to match the app's TUI */
+    --bg:#16161e;
+    --bg-dark:#0f0f15;
+    --bg-light:#1f2030;
+    --bg-pop:#1a1b26;
+    --border:#2a2c3c;
+    --fg:#c0caf5;
+    --fg-dim:#a9b1d6;
+    --comment:#565f89;
+    --cyan:#7dcfff;
+    --blue:#7aa2f7;
+    --purple:#bb9af7;
+    --pink:#f7768e;
+    --orange:#ff9e64;
+    --yellow:#e0af68;
+    --green:#9ece6a;
+    --teal:#73daca;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);}
+  body{
+    font-family:"VT323", ui-monospace, monospace;
+    font-size:18px;line-height:1.4;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+    min-height:100vh;
+  }
+  /* CRT scanlines — subtle, solid */
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:60;
+    background:repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0,0,0,.10) 3px 3px);
+    mix-blend-mode:multiply;
+  }
+
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 24px 60px;position:relative;z-index:1}
+
+  /* section labels — small uppercase caps */
+  .seclabel{
+    display:flex;justify-content:space-between;align-items:baseline;
+    margin:40px 4px 14px;
+    font-family:"Press Start 2P",monospace;font-size:10px;letter-spacing:.18em;
+    color:var(--comment);
+  }
+  .seclabel h2{margin:0;font-size:10px;font-weight:400;color:var(--fg-dim);letter-spacing:.18em}
+  .seclabel h2 b{color:var(--cyan);font-weight:400}
+  .seclabel .side{color:var(--comment)}
+
+  /* MARQUEE BAR — keep thin border so scroll has a rail */
+  .marquee{
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    overflow:hidden;
+    font-family:"VT323",monospace;font-size:20px;color:var(--fg-dim);
+    padding:5px 0;
+    letter-spacing:.04em;
+  }
+  .marquee .track{display:inline-block;white-space:nowrap;animation:slide 32s linear infinite;padding-left:100%}
+  .marquee .track span{margin:0 32px}
+  .marquee .track b{color:var(--pink)}
+  .marquee .track em{color:var(--cyan);font-style:normal}
+  @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+
+  /* TOP BAR — no card, just a row */
+  .cab{
+    display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;
+    padding:14px 4px 16px;margin-top:4px;
+    border-bottom:1px solid var(--border);
+  }
+  .cab .brand{display:flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none}
+  .cab .brand img{width:26px;height:26px;display:block;image-rendering:pixelated;border-radius:4px}
+  .cab .brand b{font-family:"Press Start 2P",monospace;font-size:10px;color:var(--cyan);letter-spacing:.04em}
+  .cab .stats{
+    display:flex;justify-content:center;gap:22px;
+    font-family:"Press Start 2P",monospace;font-size:9px;color:var(--comment);letter-spacing:.08em;
+  }
+  .cab .stats b{color:var(--fg-dim);font-weight:400}
+  .cab .credits{font-family:"Press Start 2P",monospace;font-size:9px;color:var(--comment);letter-spacing:.08em}
+  .cab .credits .blink{animation:blink 1.4s steps(2,end) infinite}
+  @keyframes blink{50%{opacity:.25}}
+
+  /* HERO — no card, no gradient, just type on the page */
+  .hero{
+    padding:64px 0 48px;
+    text-align:center;
+  }
+  .hero .preStart{
+    font-family:"Press Start 2P",monospace;font-size:10px;color:var(--comment);letter-spacing:.18em;
+    margin-bottom:22px;
+  }
+  .hero .preStart .blink{animation:blink 1.4s steps(2,end) infinite;color:var(--cyan)}
+  .hero h1{
+    margin:0;
+    font-family:"Press Start 2P",monospace;
+    font-size:clamp(28px, 6.2vw, 72px);
+    line-height:1.08;letter-spacing:0;
+    color:var(--fg);
+  }
+  .hero h1 .a{color:var(--pink)}
+  .hero .strap{
+    margin:24px auto 0;max-width:620px;
+    font-family:"VT323",monospace;font-size:clamp(19px,2.2vw,24px);
+    color:var(--fg-dim);
+  }
+  .hero .strap b{color:var(--fg)}
+  .hero .strap u{text-decoration:none;color:var(--pink)}
+  .hero .actions{margin-top:28px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+  .pixbtn{
+    font-family:"Press Start 2P",monospace;font-size:10px;letter-spacing:.08em;
+    color:var(--bg-dark);background:var(--cyan);
+    border:1px solid var(--cyan);
+    padding:12px 18px;text-decoration:none;display:inline-block;
+    transition:background .15s ease, border-color .15s ease, color .15s ease;
+    cursor:pointer;
+  }
+  .pixbtn:hover{background:var(--fg);border-color:var(--fg)}
+  .pixbtn.cy{color:var(--cyan);background:transparent;border-color:var(--border)}
+  .pixbtn.cy:hover{border-color:var(--cyan);color:var(--cyan)}
+  .pixbtn.pk{color:var(--fg-dim);background:transparent;border-color:var(--border)}
+  .pixbtn.pk:hover{border-color:var(--fg-dim);color:var(--fg)}
+  .pixbtn.yl{color:var(--yellow);background:transparent;border-color:var(--yellow)}
+  .pixbtn.yl:hover{background:var(--yellow);color:var(--bg-dark)}
+
+  /* sprite row — plain text row */
+  .sprites{
+    margin-top:36px;display:flex;justify-content:center;gap:28px;flex-wrap:wrap;align-items:end;
+    font-family:"VT323",monospace;color:var(--comment);font-size:14px;letter-spacing:.08em;text-transform:uppercase;
+  }
+  .sprite{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .sprite .px{
+    font-family:"Press Start 2P",monospace;font-size:16px;line-height:1;
+    color:var(--cyan);
+  }
+  .sprite:nth-child(2) .px{color:var(--pink)}
+  .sprite:nth-child(3) .px{color:var(--green)}
+  .sprite:nth-child(4) .px{color:var(--yellow)}
+  .sprite:nth-child(5) .px{color:var(--purple)}
+
+  /* PREVIEW — no outer card, just the label + framed image + notes */
+  .gameplay{margin-top:10px}
+  .gameplay .head{
+    display:flex;justify-content:space-between;align-items:center;
+    color:var(--fg-dim);
+    padding:0 4px 10px;
+    font-family:"Press Start 2P",monospace;font-size:9px;letter-spacing:.14em;
+  }
+  .gameplay .head b{color:var(--cyan);font-weight:400}
+  .gameplay .head .blink{animation:blink 1.4s steps(2,end) infinite;color:var(--pink)}
+  .gameplay .body{padding:0}
+  .gameplay .frame{
+    position:relative;display:block;border:1px solid var(--border);overflow:hidden;background:#000;line-height:0;
+  }
+  .gameplay .frame img{display:block;width:100%;height:auto}
+  .gameplay .frame::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0,0,0,.42) 2px 3px);
+    mix-blend-mode:multiply;
+  }
+  .gameplay .notes{
+    margin-top:18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;
+    font-family:"VT323",monospace;font-size:17px;color:var(--fg-dim);
+    padding:0 4px;
+  }
+  @media (max-width:780px){.gameplay .notes{grid-template-columns:1fr;gap:16px}}
+  .gameplay .notes div{border-left:1px solid var(--border);padding:2px 0 2px 12px}
+  .gameplay .notes b{color:var(--comment);font-family:"Press Start 2P",monospace;font-size:8px;display:block;margin-bottom:6px;letter-spacing:.16em}
+
+  /* REELS — keep frames around gifs (they ARE frames), drop outer card */
+  .demos{
+    display:grid;grid-template-columns:repeat(2,1fr);gap:22px;
+  }
+  @media (max-width:780px){.demos{grid-template-columns:1fr}}
+  .reel{overflow:visible}
+  .reel .h{
+    display:flex;justify-content:space-between;align-items:center;
+    color:var(--fg-dim);
+    padding:0 2px 8px;
+    font-family:"Press Start 2P",monospace;font-size:9px;letter-spacing:.12em;
+  }
+  .reel .h .lvl{color:var(--cyan);font-family:"Press Start 2P",monospace;font-size:9px}
+  .reel:nth-child(2) .h .lvl{color:var(--pink)}
+  .reel:nth-child(3) .h .lvl{color:var(--green)}
+  .reel:nth-child(4) .h .lvl{color:var(--yellow)}
+  .reel .frame{position:relative;background:#000;aspect-ratio:16/9;overflow:hidden;border:1px solid var(--border)}
+  .reel .frame img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(1.05) contrast(1.05)}
+  .reel .frame::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0,0,0,.28) 2px 3px);mix-blend-mode:multiply}
+  .reel .meta{padding:12px 2px 0;font-family:"VT323",monospace;font-size:17px;color:var(--fg-dim)}
+  .reel .meta h4{margin:0 0 4px;font-family:"Press Start 2P",monospace;font-size:10px;color:var(--fg);letter-spacing:.08em;line-height:1.5}
+  .reel .meta b{color:var(--cyan);font-family:"Press Start 2P",monospace;font-size:8px;letter-spacing:.08em;margin-right:6px}
+
+  /* INSTALL — no card, just rows under a section label */
+  .scores{margin-top:0}
+  .scores .h{
+    color:var(--fg-dim);
+    padding:0 4px 10px;display:flex;justify-content:space-between;
+    font-family:"Press Start 2P",monospace;font-size:9px;letter-spacing:.14em;
+  }
+  .scores .h b{color:var(--cyan);font-weight:400}
+  .scores .h .blink{animation:blink 1.4s steps(2,end) infinite;color:var(--green)}
+  .scores .body{padding:0}
+  .scores .row{
+    display:grid;grid-template-columns:170px 1fr;gap:14px;align-items:center;
+    padding:12px 4px;border-top:1px solid var(--border);
+    font-family:"VT323",monospace;font-size:19px;
+  }
+  .scores .row:last-child{border-bottom:1px solid var(--border)}
+  @media (max-width:780px){.scores .row{grid-template-columns:1fr;row-gap:4px}.scores .row code{grid-column:1/2}}
+  .scores .row .name{color:var(--fg);font-family:"Press Start 2P",monospace;font-size:9px;letter-spacing:.08em}
+  .scores .row code{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--fg-dim);background:transparent;padding:0;justify-self:end}
+
+  /* FEATURES — no cards, just a text grid with small icons */
+  .powerups{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:28px 36px;
+    padding:0 4px;
+  }
+  @media (max-width:780px){.powerups{grid-template-columns:1fr;gap:22px}}
+  .pwr{display:block;padding:0}
+  .pwr .ic{
+    display:inline-block;
+    color:var(--cyan);
+    font-family:"Press Start 2P",monospace;font-size:14px;line-height:1;
+    margin-right:8px;
+  }
+  .pwr:nth-child(2) .ic{color:var(--pink)}
+  .pwr:nth-child(3) .ic{color:var(--green)}
+  .pwr:nth-child(4) .ic{color:var(--yellow)}
+  .pwr:nth-child(5) .ic{color:var(--purple)}
+  .pwr:nth-child(6) .ic{color:var(--orange)}
+  .pwr h4{margin:0;display:inline;font-family:"Press Start 2P",monospace;font-size:10px;color:var(--fg);letter-spacing:.08em;line-height:1.5}
+  .pwr p{margin:8px 0 0;font-family:"VT323",monospace;font-size:17px;color:var(--fg-dim);line-height:1.45}
+  .pwr code{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--cyan);background:transparent;padding:0}
+
+  /* FINAL CTA — centered text, no card */
+  .boss{
+    margin-top:72px;padding:0 0 24px;
+    text-align:center;
+  }
+  .boss h2{
+    margin:0;font-family:"Press Start 2P",monospace;
+    font-size:clamp(20px,3.6vw,32px);line-height:1.25;letter-spacing:.02em;
+    color:var(--fg);
+  }
+  .boss h2 i{font-style:normal;color:var(--pink)}
+  .boss p{margin:20px auto 0;max-width:520px;font-family:"VT323",monospace;font-size:20px;color:var(--fg-dim)}
+  .boss p b{color:var(--fg)}
+  .boss .actions{margin-top:24px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+  /* CREDITS */
+  footer.credits{
+    margin-top:48px;padding:16px 4px 4px;
+    border-top:1px solid var(--border);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    font-family:"Press Start 2P",monospace;font-size:9px;color:var(--comment);letter-spacing:.08em;
+  }
+  footer.credits a{color:var(--fg-dim);text-decoration:none}
+  footer.credits a:hover{color:var(--cyan)}
+  footer.credits b{color:var(--fg-dim);font-weight:400}
+
+  ::selection{background:var(--pink);color:var(--bg-dark)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="marquee">
+    <div class="track">
+      <span><em>★</em> <b>LAZYSPOTIFY</b> · A TERMINAL SPOTIFY CLIENT SHAPED LIKE A CASSETTE DECK <em>★</em></span>
+      <span>·</span>
+      <span><em>♪</em> SIDE A · v0.3.2 · SPRING 2026 · MACOS · LINUX <em>♪</em></span>
+      <span>·</span>
+      <span><em>★</em> ~25 MB OF GO · LIBRESPOT · NO ELECTRON <em>★</em></span>
+      <span>·</span>
+      <span><em>♪</em> VIM KEYS ON EVERY LIST · FUZZY-SEARCH ANYTHING · MPRIS &amp; NOWPLAYING <em>♪</em></span>
+      <span>·</span>
+    </div>
+  </div>
+
+  <div class="cab">
+    <a class="brand" href="https://github.com/dubeyKartikay/lazyspotify">
+      <img src="../assets/logo.png" alt="lazyspotify" />
+      <b>LAZYSPOTIFY</b>
+    </a>
+    <div class="stats">
+      <span>VER <b>v0.3.2</b></span>
+      <span>DL <b>2K+</b></span>
+      <span>SIDE <b>A</b></span>
+    </div>
+    <div class="credits"><span class="blink" style="color:var(--pink)">●</span> REC</div>
+  </div>
+
+  <section class="hero">
+    <div class="preStart">▸ <span class="blink">PRESS PLAY</span> TO BEGIN ◂</div>
+    <h1>LAZY <span class="a">SPOTIFY</span></h1>
+    <p class="strap">A <b>terminal Spotify client</b> shaped like a cassette deck.<br/>Vim keys. Two reels. <u>Zero electron.</u></p>
+    <div class="actions">
+      <a class="pixbtn" href="https://github.com/dubeyKartikay/lazyspotify/releases">▶ DOWNLOAD v0.3.2</a>
+      <a class="pixbtn cy" href="#install">◉ INSTALL</a>
+      <a class="pixbtn pk" href="https://github.com/dubeyKartikay/lazyspotify">↗ SOURCE</a>
+    </div>
+
+    <div class="sprites" aria-hidden="true">
+      <div class="sprite"><span class="px">[♥]</span>premium</div>
+      <div class="sprite"><span class="px">[/]</span>fuzzy</div>
+      <div class="sprite"><span class="px">[▶]</span>play</div>
+      <div class="sprite"><span class="px">[≋]</span>mpris</div>
+      <div class="sprite"><span class="px">[◇]</span>light</div>
+    </div>
+  </section>
+
+  <section class="gameplay">
+    <div class="head">
+      <span>LIBRARY VIEW ── <b>SIDE A · LIVE</b></span>
+      <span class="blink">● ON AIR</span>
+    </div>
+    <div class="body">
+      <div class="frame">
+        <img src="../assets/lazyspotify-start.png" alt="lazyspotify cassette terminal interface" />
+      </div>
+      <div class="notes">
+        <div><b>WHAT IT IS</b>a tiny terminal Spotify client, modeled on a cassette deck.</div>
+        <div><b>CONTROLS</b><code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:14px">h j k l SPC /</code></div>
+        <div><b>ENGINE</b>patched go-librespot daemon, bundled with packaged builds.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="seclabel">
+      <h2>REELS</h2>
+      <span class="side">04 CLIPS · LOOPING</span>
+    </div>
+    <div class="demos">
+      <article class="reel">
+        <div class="h"><span>TRK A1 ── PLAY FROM PLAYLIST</span><span class="lvl">A1</span></div>
+        <div class="frame"><img src="../assets/demos/playlist-track-play.gif" alt="Play track from playlist" /></div>
+        <div class="meta">
+          <h4>DRILL · PLAY</h4>
+          <p><b>j/k</b>walk · <b>↵</b>open · <b>SPC</b>play. The deck does the rest.</p>
+        </div>
+      </article>
+      <article class="reel">
+        <div class="h"><span>TRK A2 ── LIBRARY NAVIGATION</span><span class="lvl">A2</span></div>
+        <div class="frame"><img src="../assets/demos/library-navigation.gif" alt="Library navigation" /></div>
+        <div class="meta">
+          <h4>SIX PANES</h4>
+          <p><b>h/l</b>change pane · liked, albums, made-for-you, devices.</p>
+        </div>
+      </article>
+      <article class="reel">
+        <div class="h"><span>TRK B1 ── TRANSPORT KEYS</span><span class="lvl">B1</span></div>
+        <div class="frame"><img src="../assets/demos/player-controls.gif" alt="Player controls" /></div>
+        <div class="meta">
+          <h4>SIX BUTTONS</h4>
+          <p><b>SPC</b>play · <b>n/p</b>skip · <b>+ −</b>vol · <b>s</b>shuffle. Wired to MPRIS.</p>
+        </div>
+      </article>
+      <article class="reel">
+        <div class="h"><span>TRK B2 ── FUZZY SEARCH</span><span class="lvl">B2</span></div>
+        <div class="frame"><img src="../assets/demos/search-navigation.gif" alt="Fuzzy search" /></div>
+        <div class="meta">
+          <h4>SLASH ANYTHING</h4>
+          <p><b>/</b>opens search · type 3 letters · ↵ to play. Done.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="scores" id="install">
+    <div class="h"><span><b>SIDE A</b> ── INSTALL</span><span class="blink">● READY</span></div>
+    <div class="body">
+      <div class="row">
+        <span class="name">HOMEBREW</span>
+        <code>brew install dubeyKartikay/lazyspotify/lazyspotify</code>
+      </div>
+      <div class="row">
+        <span class="name">ARCH (AUR)</span>
+        <code>yay -S lazyspotify-bin</code>
+      </div>
+      <div class="row">
+        <span class="name">DEBIAN .DEB</span>
+        <code>sudo dpkg -i lazyspotify-*.deb</code>
+      </div>
+      <div class="row">
+        <span class="name">FEDORA .RPM</span>
+        <code>sudo dnf install ./lazyspotify-*.rpm</code>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="seclabel">
+      <h2><b>SIDE B</b> ── FEATURES</h2>
+      <span class="side">FIVE OF THEM</span>
+    </div>
+    <div class="powerups">
+      <div class="pwr">
+        <div class="ic">⌘</div>
+        <h4>VIM MOTIONS</h4>
+        <p><code>h j k l</code> to move · <code>g g</code> / <code>G</code> to jump · keymap is configurable.</p>
+      </div>
+      <div class="pwr">
+        <div class="ic">≋</div>
+        <h4>MPRIS BUS</h4>
+        <p>Full MPRIS support on Linux. Media keys &amp; lockscreen pick up the current track automatically.</p>
+      </div>
+      <div class="pwr">
+        <div class="ic">⌁</div>
+        <h4>CONNECT</h4>
+        <p>Cast to any Spotify device on your account from the Devices pane.</p>
+      </div>
+      <div class="pwr">
+        <div class="ic">◇</div>
+        <h4>LIGHTWEIGHT</h4>
+        <p>A single ~25 MB Go binaries. No Chromium, no Electron, no 700 MB background process eating your battery.</p>
+      </div>
+      <div class="pwr">
+        <div class="ic">▶</div>
+        <h4>LIBRESPOT</h4>
+        <p>Audio handled by a patched <i>go-librespot</i> daemon. Bundled in packaged builds.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="boss">
+    <h2>READY TO <i>PRESS PLAY?</i></h2>
+    <p>Sixty megabytes. <b>MIT-licensed.</b> Spotify Premium required. No telemetry, no mailing list.</p>
+    <div class="actions">
+      <a class="pixbtn yl" href="https://github.com/dubeyKartikay/lazyspotify/releases">▶ DOWNLOAD v0.3.2</a>
+      <a class="pixbtn cy" href="https://github.com/dubeyKartikay/lazyspotify">↗ READ THE DOCS</a>
+    </div>
+  </section>
+
+  <footer class="credits">
+    <div>© <b>2026</b> · K. DUBEY · MIT</div>
+    <div>
+      <a href="https://github.com/dubeyKartikay/lazyspotify">GITHUB</a> ·
+      <a href="https://github.com/dubeyKartikay/lazyspotify/releases">RELEASES</a> ·
+      <a href="https://github.com/dubeyKartikay/lazyspotify/issues">ISSUES</a>
+    </div>
+    <div>SET IN <b>PRESS START 2P</b> &amp; <b>VT323</b></div>
+  </footer>
+
+</div>
+</body>
+</html>
