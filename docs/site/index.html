@@ -3,11 +3,60 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>★ LAZYSPOTIFY ── SIDE A · v0.3.2 ★</title>
-<meta name="description" content="lazyspotify — a terminal Spotify client shaped like a cassette deck." />
+<title>LazySpotify | Spotify Terminal Client, Terminal-Based Spotify App &amp; TUI</title>
+<meta name="description" content="LazySpotify is a terminal Spotify client and Spotify TUI for macOS and Linux, with vim keys, fuzzy search, playlist browsing, and lightweight playback controls." />
+<meta name="keywords" content="spotify terminal, terminal based spotify, spotify tui, terminal spotify client, lazyspotify, spotify cli, terminal music player" />
+<meta name="author" content="K. Dubey" />
+<meta name="robots" content="index,follow,max-image-preview:large" />
+<meta name="theme-color" content="#16161e" />
+<link rel="canonical" href="https://dubeykartikay.github.io/lazyspotify/" />
+<link rel="icon" type="image/png" href="../assets/logo.png" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="LazySpotify" />
+<meta property="og:title" content="LazySpotify | Spotify Terminal Client, Terminal-Based Spotify App &amp; TUI" />
+<meta property="og:description" content="A cassette-deck styled Spotify terminal client and Spotify TUI for macOS and Linux." />
+<meta property="og:url" content="https://dubeykartikay.github.io/lazyspotify/" />
+<meta property="og:image" content="https://dubeykartikay.github.io/lazyspotify/assets/lazyspotify-start.png" />
+<meta property="og:image:alt" content="LazySpotify terminal interface styled like a cassette deck" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="LazySpotify | Spotify Terminal Client, Terminal-Based Spotify App &amp; TUI" />
+<meta name="twitter:description" content="A lightweight terminal based Spotify client with vim motions, fuzzy search, and a cassette-deck UI." />
+<meta name="twitter:image" content="https://dubeykartikay.github.io/lazyspotify/assets/lazyspotify-start.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "LazySpotify",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "macOS, Linux",
+  "softwareVersion": "0.3.2",
+  "description": "LazySpotify is a terminal Spotify client and Spotify TUI for macOS and Linux, built for keyboard-driven playback, browsing, and search.",
+  "url": "https://dubeykartikay.github.io/lazyspotify/",
+  "downloadUrl": "https://github.com/dubeyKartikay/lazyspotify/releases",
+  "codeRepository": "https://github.com/dubeyKartikay/lazyspotify",
+  "license": "https://github.com/dubeyKartikay/lazyspotify/blob/main/LICENSE",
+  "image": "https://dubeykartikay.github.io/lazyspotify/assets/lazyspotify-start.png",
+  "screenshot": "https://dubeykartikay.github.io/lazyspotify/assets/lazyspotify-start.png",
+  "author": {
+    "@type": "Person",
+    "name": "K. Dubey"
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "keywords": [
+    "spotify terminal",
+    "terminal based spotify",
+    "spotify tui",
+    "terminal spotify client"
+  ]
+}
+</script>
 <style>
   :root{
     /* Tokyo Night — tuned to match the app's TUI */
@@ -276,7 +325,8 @@
 
 <div class="wrap">
 
-  <div class="marquee">
+  <header>
+  <div class="marquee" aria-label="LazySpotify highlights">
     <div class="track">
       <span><em>★</em> <b>LAZYSPOTIFY</b> · A TERMINAL SPOTIFY CLIENT SHAPED LIKE A CASSETTE DECK <em>★</em></span>
       <span>·</span>
@@ -290,8 +340,8 @@
   </div>
 
   <div class="cab">
-    <a class="brand" href="https://github.com/dubeyKartikay/lazyspotify">
-      <img src="../assets/logo.png" alt="lazyspotify" />
+    <a class="brand" href="https://github.com/dubeyKartikay/lazyspotify" rel="noopener noreferrer">
+      <img src="../assets/logo.png" alt="LazySpotify logo" />
       <b>LAZYSPOTIFY</b>
     </a>
     <div class="stats">
@@ -301,15 +351,17 @@
     </div>
     <div class="credits"><span class="blink" style="color:var(--pink)">●</span> REC</div>
   </div>
+  </header>
 
-  <section class="hero">
+  <main>
+  <section class="hero" aria-labelledby="hero-title">
     <div class="preStart">▸ <span class="blink">PRESS PLAY</span> TO BEGIN ◂</div>
-    <h1>LAZY <span class="a">SPOTIFY</span></h1>
-    <p class="strap">A <b>terminal Spotify client</b> shaped like a cassette deck.<br/>Vim keys. Two reels. <u>Zero electron.</u></p>
+    <h1 id="hero-title">LAZY <span class="a">SPOTIFY</span></h1>
+    <p class="strap">A <b>terminal Spotify client</b> and <b>Spotify TUI</b> shaped like a cassette deck.<br/>Vim keys. Two reels. <u>Zero electron.</u></p>
     <div class="actions">
-      <a class="pixbtn" href="https://github.com/dubeyKartikay/lazyspotify/releases">▶ DOWNLOAD v0.3.2</a>
+      <a class="pixbtn" href="https://github.com/dubeyKartikay/lazyspotify/releases" rel="noopener noreferrer">▶ DOWNLOAD v0.3.2</a>
       <a class="pixbtn cy" href="#install">◉ INSTALL</a>
-      <a class="pixbtn pk" href="https://github.com/dubeyKartikay/lazyspotify">↗ SOURCE</a>
+      <a class="pixbtn pk" href="https://github.com/dubeyKartikay/lazyspotify" rel="noopener noreferrer">↗ SOURCE</a>
     </div>
 
     <div class="sprites" aria-hidden="true">
@@ -321,17 +373,17 @@
     </div>
   </section>
 
-  <section class="gameplay">
+  <section class="gameplay" aria-label="LazySpotify interface preview">
     <div class="head">
       <span>LIBRARY VIEW ── <b>SIDE A · LIVE</b></span>
       <span class="blink">● ON AIR</span>
     </div>
     <div class="body">
       <div class="frame">
-        <img src="../assets/lazyspotify-start.png" alt="lazyspotify cassette terminal interface" />
+        <img src="../assets/lazyspotify-start.png" alt="LazySpotify Spotify terminal interface and cassette deck styled TUI" />
       </div>
       <div class="notes">
-        <div><b>WHAT IT IS</b>a tiny terminal Spotify client, modeled on a cassette deck.</div>
+        <div><b>WHAT IT IS</b>a tiny terminal based Spotify client and Spotify TUI, modeled on a cassette deck.</div>
         <div><b>CONTROLS</b><code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:14px">h j k l SPC /</code></div>
         <div><b>ENGINE</b>patched go-librespot daemon, bundled with packaged builds.</div>
       </div>
@@ -346,7 +398,7 @@
     <div class="demos">
       <article class="reel">
         <div class="h"><span>TRK A1 ── PLAY FROM PLAYLIST</span><span class="lvl">A1</span></div>
-        <div class="frame"><img src="../assets/demos/playlist-track-play.gif" alt="Play track from playlist" /></div>
+        <div class="frame"><img src="../assets/demos/playlist-track-play.gif" alt="LazySpotify terminal playlist playback demo" /></div>
         <div class="meta">
           <h4>DRILL · PLAY</h4>
           <p><b>j/k</b>walk · <b>↵</b>open · <b>SPC</b>play. The deck does the rest.</p>
@@ -354,7 +406,7 @@
       </article>
       <article class="reel">
         <div class="h"><span>TRK A2 ── LIBRARY NAVIGATION</span><span class="lvl">A2</span></div>
-        <div class="frame"><img src="../assets/demos/library-navigation.gif" alt="Library navigation" /></div>
+        <div class="frame"><img src="../assets/demos/library-navigation.gif" alt="Spotify TUI library navigation demo" /></div>
         <div class="meta">
           <h4>SIX PANES</h4>
           <p><b>h/l</b>change pane · liked, albums, made-for-you, devices.</p>
@@ -362,15 +414,15 @@
       </article>
       <article class="reel">
         <div class="h"><span>TRK B1 ── TRANSPORT KEYS</span><span class="lvl">B1</span></div>
-        <div class="frame"><img src="../assets/demos/player-controls.gif" alt="Player controls" /></div>
+        <div class="frame"><img src="../assets/demos/player-controls.gif" alt="Terminal based Spotify playback controls demo" /></div>
         <div class="meta">
           <h4>SIX BUTTONS</h4>
-          <p><b>SPC</b>play · <b>n/p</b>skip · <b>+ −</b>vol · <b>s</b>shuffle. Wired to MPRIS.</p>
+          <p><b>SPC</b>play · <b>n/p</b>skip · <b>h j</b>vol.</p>
         </div>
       </article>
       <article class="reel">
         <div class="h"><span>TRK B2 ── FUZZY SEARCH</span><span class="lvl">B2</span></div>
-        <div class="frame"><img src="../assets/demos/search-navigation.gif" alt="Fuzzy search" /></div>
+        <div class="frame"><img src="../assets/demos/search-navigation.gif" alt="Spotify terminal fuzzy search demo" /></div>
         <div class="meta">
           <h4>SLASH ANYTHING</h4>
           <p><b>/</b>opens search · type 3 letters · ↵ to play. Done.</p>
@@ -437,19 +489,20 @@
 
   <section class="boss">
     <h2>READY TO <i>PRESS PLAY?</i></h2>
-    <p>Sixty megabytes. <b>MIT-licensed.</b> Spotify Premium required. No telemetry, no mailing list.</p>
+    <p>25 megabytes. <b>MIT-licensed.</b> Spotify Premium required. No telemetry, no mailing list.</p>
     <div class="actions">
-      <a class="pixbtn yl" href="https://github.com/dubeyKartikay/lazyspotify/releases">▶ DOWNLOAD v0.3.2</a>
-      <a class="pixbtn cy" href="https://github.com/dubeyKartikay/lazyspotify">↗ READ THE DOCS</a>
+      <a class="pixbtn yl" href="https://github.com/dubeyKartikay/lazyspotify/releases" rel="noopener noreferrer">▶ DOWNLOAD v0.3.2</a>
+      <a class="pixbtn cy" href="https://github.com/dubeyKartikay/lazyspotify" rel="noopener noreferrer">↗ READ THE DOCS</a>
     </div>
   </section>
+  </main>
 
   <footer class="credits">
     <div>© <b>2026</b> · K. DUBEY · MIT</div>
     <div>
-      <a href="https://github.com/dubeyKartikay/lazyspotify">GITHUB</a> ·
-      <a href="https://github.com/dubeyKartikay/lazyspotify/releases">RELEASES</a> ·
-      <a href="https://github.com/dubeyKartikay/lazyspotify/issues">ISSUES</a>
+      <a href="https://github.com/dubeyKartikay/lazyspotify" rel="noopener noreferrer">GITHUB</a> ·
+      <a href="https://github.com/dubeyKartikay/lazyspotify/releases" rel="noopener noreferrer">RELEASES</a> ·
+      <a href="https://github.com/dubeyKartikay/lazyspotify/issues" rel="noopener noreferrer">ISSUES</a>
     </div>
     <div>SET IN <b>PRESS START 2P</b> &amp; <b>VT323</b></div>
   </footer>
