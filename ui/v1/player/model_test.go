@@ -17,6 +17,7 @@ func TestNewButtonsOrder(t *testing.T) {
 		PauseButton,
 		SeekForwardButton,
 		NextButton,
+		ShuffleButton,
 	}
 
 	if len(got) != len(want) {

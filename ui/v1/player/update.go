@@ -42,6 +42,7 @@ func (m *Model) UpdateStatus(status Status) {
 	s.DurationMs = status.Duration
 	s.Volume = status.Volume
 	s.VolumeMax = status.MaxVolume
+	s.Shuffled = status.Shuffled
 }
 
 func (m *Model) ShowVolume() tea.Cmd {

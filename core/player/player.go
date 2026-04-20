@@ -111,6 +111,20 @@ func (p *Player) Previous(ctx context.Context) error {
 	return nil
 }
 
+func (p *Player) Shuffle(ctx context.Context, shuffle bool) error {
+	l, err := p.requireLibrespot()
+	if err != nil {
+		return err
+	}
+	logger.Log.Info().Bool("shuffle", shuffle).Msg("toggling shuffle")
+	res := l.Client.Shuffle(ctx, shuffle)
+	if res >= 400 {
+		return fmt.Errorf("failed to toggle shuffle: daemon returned status %d", res)
+	}
+	logger.Log.Info().Int("status", res).Msg("shuffle response")
+	return nil
+}
+
 func (p *Player) SetVolume(ctx context.Context, volume int, relative bool) error {
 	l, err := p.requireLibrespot()
 	if err != nil {
