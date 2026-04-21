@@ -15,3 +15,7 @@ type VolumeRequest struct {
 	Volume   int  `json:"volume"`
 	Relative bool `json:"relative"`
 }
+
+type ShuffleRequest struct {
+	Shuffle bool `json:"shuffle_context"`
+}

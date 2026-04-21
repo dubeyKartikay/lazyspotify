@@ -24,6 +24,7 @@ const (
 	previousPath      = "/player/prev"
 	volumePath        = "/player/volume"
 	resolveTracksPath = "/resolver/tracks"
+	shufflePath      = "/player/shuffle_context"
 )
 
 type LibrespotApiServer struct {
@@ -175,6 +176,15 @@ func (l *LibrespotApiClient) GetVolume(ctx context.Context) (*models.VolumeRespo
 	}
 
 	return &volumeRes, nil
+}
+
+func (l *LibrespotApiClient) Shuffle(ctx context.Context, shuffle bool) int {
+	shuffleRequestJSON, err := models.NewShuffleRequest(shuffle)
+	if err != nil {
+		logger.Log.Error().Err(err).Msg("failed to marshal shuffle request")
+		return http.StatusInternalServerError
+	}
+	return l.doPostStatus(ctx, shufflePath, shuffleRequestJSON)
 }
 
 func (l *LibrespotApiClient) ResolvePlaylistTracks(ctx context.Context, uri string, offset int, limit int) (*models.ResolveTracksResponse, error) {

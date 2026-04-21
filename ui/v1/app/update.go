@@ -131,6 +131,10 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		m.markVolumeOverlay()
 		m.updatePlayerStatus()
 		return m.mediaCenter.ShowVolume(), true
+	case shuffleOkMsg:
+		m.shuffled = msg.shuffled
+		m.updatePlayerStatus()
+		return nil, true
 	case transportErrMsg:
 		logger.Log.Error().Err(msg.err).Str("action", msg.action).Msg("transport action failed")
 		m.showActionError(msg.action, msg.err)
@@ -164,6 +168,8 @@ func (m *Model) handleTransportInput(msg tea.Msg, centerCmd tea.Cmd) (tea.Cmd, b
 		return tea.Batch(m.decrementVolumeCmd(), centerCmd), true
 	case key.Matches(keyMsg, m.keys.VolumeUp):
 		return tea.Batch(m.incrementVolumeCmd(), centerCmd), true
+	case key.Matches(keyMsg, m.keys.Shuffle):
+		return tea.Batch(m.mediaCenter.PressButton(player.ShuffleButton), m.shuffleCmd(), centerCmd), true
 	}
 
 	return nil, false

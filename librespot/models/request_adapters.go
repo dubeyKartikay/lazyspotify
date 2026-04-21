@@ -30,3 +30,10 @@ func NewVolumeRequest(volume int, relative bool) ([]byte, error) {
 	}
 	return marshalRequest(volumeRequest)
 }
+
+func NewShuffleRequest(shuffle bool) ([]byte, error) {
+	shuffleRequest := ShuffleRequest{
+		Shuffle: shuffle,
+	}
+	return marshalRequest(shuffleRequest)
+}
