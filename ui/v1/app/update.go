@@ -132,7 +132,6 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		m.updatePlayerStatus()
 		return m.mediaCenter.ShowVolume(), true
 	case shuffleOkMsg:
-		m.shuffled = msg.shuffled
 		m.updatePlayerStatus()
 		return nil, true
 	case transportErrMsg:
@@ -169,7 +168,7 @@ func (m *Model) handleTransportInput(msg tea.Msg, centerCmd tea.Cmd) (tea.Cmd, b
 	case key.Matches(keyMsg, m.keys.VolumeUp):
 		return tea.Batch(m.incrementVolumeCmd(), centerCmd), true
 	case key.Matches(keyMsg, m.keys.Shuffle):
-		return tea.Batch(m.mediaCenter.PressButton(player.ShuffleButton), m.shuffleCmd(), centerCmd), true
+		return tea.Batch(m.shuffleCmd(), centerCmd), true
 	}
 
 	return nil, false

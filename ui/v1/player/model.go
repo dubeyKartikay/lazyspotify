@@ -13,7 +13,6 @@ const (
 	SeekBackwardButton
 	NextButton
 	PreviousButton
-	ShuffleButton
 )
 
 type Status struct {
@@ -60,7 +59,6 @@ func newButtons() []button {
 		{kind: PauseButton, icon: "||"},
 		{kind: SeekForwardButton, icon: ">>"},
 		{kind: NextButton, icon: ">|"},
-		{kind: ShuffleButton, icon: "<>"},
 	}
 	return buildButtons(specs)
 }

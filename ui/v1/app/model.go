@@ -28,7 +28,6 @@ type Model struct {
 	authModel          *uiauth.Model
 	playing            bool
 	playerReady        bool
-	shuffled           bool
 	songInfo           common.SongInfo
 	volumeInfo         common.VolumeInfo
 	volumeOverlayUntil time.Time
@@ -93,9 +92,7 @@ type transportErrMsg struct {
 	action string
 }
 
-type shuffleOkMsg struct {
-	shuffled bool
-}
+type shuffleOkMsg struct{}
 
 type fatalErrMsg struct {
 	err error
@@ -354,7 +351,7 @@ func (m *Model) updatePlayerStatus() {
 		Duration:    m.songInfo.Duration,
 		Volume:      m.volumeInfo.Volume,
 		MaxVolume:   maxVolume,
-		Shuffled:    m.shuffled,
+		Shuffled:    m.player.Shuffled(),
 	})
 }
 
@@ -474,12 +471,12 @@ func (m *Model) previousCmd() tea.Cmd {
 }
 
 func (m *Model) shuffleCmd() tea.Cmd {
-	targetShuffle := !m.shuffled
+	targetShuffle := !m.player.Shuffled()
 	return func() tea.Msg {
 		if err := m.shuffle(targetShuffle); err != nil {
 			return transportErrMsg{err: err, action: "Failed to toggle shuffle"}
 		}
-		return shuffleOkMsg{shuffled: targetShuffle}
+		return shuffleOkMsg{}
 	}
 }
 

@@ -132,7 +132,7 @@ func cassetteStatusIndicator(status cassetteStatus) string {
 	if status.Playing {
 		shuffleIndicator := ""
 		if status.Shuffled {
-			shuffleIndicator = lipgloss.NewStyle().Foreground(lipgloss.BrightYellow).Bold(true).Render("SHUF ")
+			shuffleIndicator = lipgloss.NewStyle().Foreground(lipgloss.BrightYellow).Bold(true).Render(">< ")
 		}
 		text := lipgloss.JoinHorizontal(lipgloss.Left, formatDuration(status.CurrentMs), "/", formatDuration(status.DurationMs))
 		return shuffleIndicator + lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render(text)
