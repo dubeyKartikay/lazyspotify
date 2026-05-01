@@ -81,7 +81,7 @@ func getDefaultAppConfig() AppConfig {
 	cfg.Librespot.RetryDelay = 100
 	cfg.Librespot.MaxRetries = 3
 	cfg.Librespot.SeekStepMs = 5000
-	cfg.Librespot.VolumeStep = 65535 / 20
+	cfg.Librespot.VolumeStep = 20
 	cfg.Librespot.Daemon.LogLevel = "ERROR"
 	return cfg
 }

@@ -171,7 +171,7 @@ The generated daemon config is written automatically under the `librespot/` subd
 | `librespot.retry-delay` | No | `100` | Retry delay in milliseconds. |
 | `librespot.max-retries` | No | `3` | Retry count for daemon calls. |
 | `librespot.seek-step-ms` | No | `5000` | Seek step size in milliseconds. |
-| `librespot.volume-step` | No | `3276` | Volume step used for volume controls. |
+| `librespot.volume-step` | No | `20` | Volume step percentage (0-100) used for volume controls. |
 | `librespot.daemon.cmd` | Sometimes | none | Required for source/manual installs unless a packaged daemon path was compiled into the binary. |
 | `librespot.daemon.log_level` | No | `ERROR` | Log level written into the generated librespot daemon config. |
 | `librespot.daemon.zeroconf_enabled` | No | `false` | Enables zeroconf in the daemon config. |
