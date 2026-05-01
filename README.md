@@ -50,6 +50,30 @@ sudo dpkg -i lazyspotify-*.deb
 sudo dnf install ./lazyspotify-*.rpm
 ```
 
+### Other Installation Methods
+
+<details>
+  <summary><b>Nix / NixOS</b></summary>
+
+  ##### Ephemeral / One-Off Run (No Installation)
+  ```bash
+  nix run github:dubeyKartikay/lazyspotify
+  ```
+  ##### Imperative Installation
+  ```bash
+  nix profile install github:dubeyKartikay/lazyspotify
+  ```
+  ##### Declarative Installation
+  ###### in your flake.nix
+  ```nix
+  lazyspotify.url = "github:dubeyKartikay/lazyspotify";
+  ```
+  ###### in your system or home-manager packages
+  ```nix
+  inputs.lazyspotify.packages.${pkgs.system}.default
+  ```
+</details>
+
 ### Build From Source
 
 Build the app:
