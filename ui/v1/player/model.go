@@ -22,6 +22,7 @@ type Status struct {
 	Duration    int
 	Volume      int
 	MaxVolume   int
+	Shuffled    bool
 }
 
 type Model struct {

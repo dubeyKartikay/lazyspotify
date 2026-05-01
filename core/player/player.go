@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/librespot"
@@ -12,6 +13,8 @@ import (
 
 type Player struct {
 	librespot *librespot.Librespot
+	mu        sync.RWMutex
+	shuffled  bool
 }
 
 func NewPlayer(ctx context.Context, userId string, accessToken string) (*Player, error) {
@@ -109,6 +112,32 @@ func (p *Player) Previous(ctx context.Context) error {
 	}
 	logger.Log.Info().Int("status", res).Msg("previous response")
 	return nil
+}
+
+func (p *Player) Shuffle(ctx context.Context, shuffle bool) error {
+	l, err := p.requireLibrespot()
+	if err != nil {
+		return err
+	}
+	logger.Log.Info().Bool("shuffle", shuffle).Msg("toggling shuffle")
+	res := l.Client.Shuffle(ctx, shuffle)
+	if res >= 400 {
+		return fmt.Errorf("failed to toggle shuffle: daemon returned status %d", res)
+	}
+	p.mu.Lock()
+	p.shuffled = shuffle
+	p.mu.Unlock()
+	logger.Log.Info().Int("status", res).Msg("shuffle response")
+	return nil
+}
+
+func (p *Player) Shuffled() bool {
+	if p == nil {
+		return false
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.shuffled
 }
 
 func (p *Player) SetVolume(ctx context.Context, volume int, relative bool) error {

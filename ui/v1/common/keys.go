@@ -25,6 +25,7 @@ type AppKeyMap struct {
 	PrevTrack      key.Binding
 	VolumeDown     key.Binding
 	VolumeUp       key.Binding
+	Shuffle        key.Binding
 	ZenMode        key.Binding
 	MediaPanelOpen bool
 	InfoOpen       bool
@@ -112,6 +113,10 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithKeys("k", "ctrl+n"),
 			key.WithHelp("k", "volume +"),
 		),
+		Shuffle: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "shuffle"),
+		),
 		ZenMode: key.NewBinding(
 			key.WithKeys("z"),
 			key.WithHelp("z", "zen mode"),
@@ -147,7 +152,7 @@ func (k AppKeyMap) FullHelp() [][]key.Binding {
 	}
 	return append(help,
 		[]key.Binding{k.PlayPause, k.SeekForward, k.SeekBackward},
-		[]key.Binding{k.VolumeDown, k.VolumeUp, k.NextTrack, k.PrevTrack},
+		[]key.Binding{k.VolumeDown, k.VolumeUp, k.NextTrack, k.PrevTrack, k.Shuffle},
 	)
 }
 

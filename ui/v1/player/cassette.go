@@ -21,6 +21,7 @@ type cassetteStatus struct {
 	DurationMs int
 	Volume     int
 	VolumeMax  int
+	Shuffled   bool
 }
 
 func newCassette() cassette {
@@ -129,8 +130,12 @@ func cassetteStatusIndicator(status cassetteStatus) string {
 		return lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render(text)
 	}
 	if status.Playing {
+		shuffleIndicator := ""
+		if status.Shuffled {
+			shuffleIndicator = lipgloss.NewStyle().Foreground(lipgloss.BrightYellow).Bold(true).Render(">< ")
+		}
 		text := lipgloss.JoinHorizontal(lipgloss.Left, formatDuration(status.CurrentMs), "/", formatDuration(status.DurationMs))
-		return lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render(text)
+		return shuffleIndicator + lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render(text)
 	}
 	dot := lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render("●")
 	text := lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Bold(true).Render(" READY")

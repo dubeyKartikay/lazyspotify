@@ -92,6 +92,8 @@ type transportErrMsg struct {
 	action string
 }
 
+type shuffleOkMsg struct{}
+
 type fatalErrMsg struct {
 	err error
 }
@@ -349,6 +351,7 @@ func (m *Model) updatePlayerStatus() {
 		Duration:    m.songInfo.Duration,
 		Volume:      m.volumeInfo.Volume,
 		MaxVolume:   maxVolume,
+		Shuffled:    m.player.Shuffled(),
 	})
 }
 
@@ -387,6 +390,13 @@ func (m *Model) previous() error {
 		return fmt.Errorf("player not ready")
 	}
 	return m.player.Previous(context.Background())
+}
+
+func (m *Model) shuffle(shuffle bool) error {
+	if m.player == nil {
+		return fmt.Errorf("player not ready")
+	}
+	return m.player.Shuffle(context.Background(), shuffle)
 }
 
 func (m *Model) changeVolume(deltaPercent int) (common.VolumeInfo, error) {
@@ -458,6 +468,16 @@ func (m *Model) previousCmd() tea.Cmd {
 			return transportErrMsg{err: err, action: "Failed to skip to previous track"}
 		}
 		return nil
+	}
+}
+
+func (m *Model) shuffleCmd() tea.Cmd {
+	targetShuffle := !m.player.Shuffled()
+	return func() tea.Msg {
+		if err := m.shuffle(targetShuffle); err != nil {
+			return transportErrMsg{err: err, action: "Failed to toggle shuffle"}
+		}
+		return shuffleOkMsg{}
 	}
 }
 
