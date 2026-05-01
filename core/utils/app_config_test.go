@@ -70,6 +70,14 @@ func TestGetDefaultAppConfigUsesErrorLogLevels(t *testing.T) {
 	}
 }
 
+func TestGetDefaultAppConfigVolumeStepIsPercentage(t *testing.T) {
+	cfg := getDefaultAppConfig()
+
+	if got := cfg.Librespot.VolumeStep; got != 20 {
+		t.Fatalf("getDefaultAppConfig().Librespot.VolumeStep = %d, want 20", got)
+	}
+}
+
 func TestLoadConfigCreatesConfigYMLWhenMissing(t *testing.T) {
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)

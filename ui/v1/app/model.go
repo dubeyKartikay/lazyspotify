@@ -389,7 +389,7 @@ func (m *Model) previous() error {
 	return m.player.Previous(context.Background())
 }
 
-func (m *Model) changeVolume(delta int) (common.VolumeInfo, error) {
+func (m *Model) changeVolume(deltaPercent int) (common.VolumeInfo, error) {
 	if m.player == nil {
 		return common.VolumeInfo{}, fmt.Errorf("player not ready")
 	}
@@ -404,9 +404,10 @@ func (m *Model) changeVolume(delta int) (common.VolumeInfo, error) {
 		maxVolume = m.volumeInfo.Max
 	}
 	if maxVolume <= 0 {
-		maxVolume = 100
+		maxVolume = 65535
 	}
 
+	delta := calcVolumeDelta(maxVolume, deltaPercent)
 	target := max(0, min(maxVolume, volume.Value+delta))
 	if err := m.player.SetVolume(context.Background(), target, false); err != nil {
 		return common.VolumeInfo{}, err
@@ -543,6 +544,10 @@ func paginationFromCursor(page, count, total, pageSize int, nextCursor string) c
 		HasNext:     hasNext,
 		NextCursor:  nextCursor,
 	}
+}
+
+func calcVolumeDelta(maxVolume, stepPercent int) int {
+	return maxVolume * stepPercent / 100
 }
 
 func ExitIfRunFails(err error) {
