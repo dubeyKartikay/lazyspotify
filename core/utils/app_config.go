@@ -60,6 +60,11 @@ type AppConfig struct {
 			ZeroconfEnabled bool     `mapstructure:"zeroconf_enabled"`
 		} `mapstructure:"daemon"`
 	} `mapstructure:"librespot"`
+	Lyrics struct {
+		// SocketPath, if set, is a Unix domain socket path where lazyspotify
+		// writes newline-delimited JSON snapshots of the current lyric line.
+		SocketPath string `mapstructure:"socket_path"`
+	} `mapstructure:"lyrics"`
 }
 
 func (c AppConfig) SpotifyClientID() string {
@@ -83,6 +88,7 @@ func getDefaultAppConfig() AppConfig {
 	cfg.Librespot.SeekStepMs = 5000
 	cfg.Librespot.VolumeStep = 20
 	cfg.Librespot.Daemon.LogLevel = "ERROR"
+	cfg.Lyrics.SocketPath = ""
 	return cfg
 }
 
@@ -181,4 +187,5 @@ func applyConfigDefaults(v *viper.Viper) {
 	v.SetDefault("librespot.volume-step", defaults.Librespot.VolumeStep)
 	v.SetDefault("librespot.daemon.log_level", defaults.Librespot.Daemon.LogLevel)
 	v.SetDefault("librespot.daemon.zeroconf_enabled", defaults.Librespot.Daemon.ZeroconfEnabled)
+	v.SetDefault("lyrics.socket_path", defaults.Lyrics.SocketPath)
 }

@@ -67,11 +67,12 @@ const (
 )
 
 type SongInfo struct {
-	Title    string
-	Artist   string
-	Album    string
-	Position int
-	Duration int
+	Title     string
+	Artist    string
+	Album     string
+	TrackURI  string
+	Position  int
+	Duration  int
 }
 
 type VolumeInfo struct {

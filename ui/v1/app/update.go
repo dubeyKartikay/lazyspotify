@@ -50,6 +50,11 @@ func (m *Model) handleShellInput(msg tea.Msg) (tea.Cmd, bool) {
 			return nil, true
 		case key.Matches(msg, m.keys.Quit):
 			return tea.Quit, true
+		case key.Matches(msg, m.keys.Lyrics):
+			if !m.mediaCenter.IsOpen() {
+				m.lyricsViewOpen = !m.lyricsViewOpen
+				return nil, true
+			}
 		}
 	case tea.WindowSizeMsg:
 		m.setSize(msg.Width, msg.Height)
@@ -70,8 +75,10 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 			return m.Init(), true
 		}
 	case ticker.TickFastMsg:
-		m.advancePlayback(180)
+		m.refreshPlaybackPosition()
 		m.mediaCenter.TickPlayer(m.playing)
+		m.syncLyricsView()
+		m.maybePublishLyricsSocket()
 		return ticker.DoTickFast(), true
 	case ticker.TickMsg:
 		return m.mediaCenter.TickDisplay(), true
@@ -104,7 +111,36 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	case playerEventMsg:
 		m.applyPlayerEvent(msg.event)
 		m.updatePlayerStatus()
-		return m.waitForPlayerEvent(), true
+		cmds := []tea.Cmd{m.waitForPlayerEvent()}
+		if uri := m.lyricsFetchPending; uri != "" {
+			m.lyricsFetchPending = ""
+			cmds = append(cmds, m.fetchLyricsCmd(uri, m.songInfo.Title, m.songInfo.Artist, m.songInfo.Album, m.songInfo.Duration))
+		}
+		m.syncLyricsView()
+		m.lastSockLineIdx = -999
+		m.maybePublishLyricsSocket()
+		return tea.Batch(cmds...), true
+	case lyricsLoadMsg:
+		if msg.trackURI != m.songInfo.TrackURI {
+			return nil, true
+		}
+		if msg.err != nil {
+			m.lyricsLines = nil
+			m.lyricsErr = msg.err.Error()
+			m.lyricsSync = ""
+		} else if msg.track != nil {
+			m.lyricsLines = msg.track.Lines
+			m.lyricsErr = ""
+			m.lyricsSync = msg.track.SyncType
+		} else {
+			m.lyricsLines = nil
+			m.lyricsErr = ""
+			m.lyricsSync = ""
+		}
+		m.syncLyricsView()
+		m.lastSockLineIdx = -999
+		m.maybePublishLyricsSocket()
+		return nil, true
 	case playerEventsClosedMsg:
 		logger.Log.Warn().Msg("player events stream closed")
 		return nil, true
