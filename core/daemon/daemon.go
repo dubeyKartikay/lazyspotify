@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/core/utils"
@@ -15,8 +16,11 @@ type DaemonProcess struct {
 }
 
 func NewDaemonProcess(ctx context.Context, args []string) (DaemonProcess, error) {
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	if len(args) == 0 || strings.TrimSpace(args[0]) == "" {
+		return DaemonProcess{}, fmt.Errorf("daemon command is empty")
+	}
 	ctx, cancel := context.WithCancel(ctx)
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	return DaemonProcess{cmd: cmd, cancel: cancel}, nil
 }
 
