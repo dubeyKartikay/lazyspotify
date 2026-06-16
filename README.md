@@ -36,6 +36,14 @@ brew install lazyspotify
 yay -S lazyspotify-bin
 ```
 
+### Nix
+
+Available in [Nixpkgs](https://search.nixos.org/packages?channel=unstable&query=lazyspotify#show=lazyspotify).
+
+```bash
+nix run nixpkgs#lazyspotify
+```
+
 ### GitHub Releases
 
 Download the latest package from [GitHub Releases](https://github.com/dubeyKartikay/lazyspotify/releases).
