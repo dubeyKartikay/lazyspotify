@@ -1,6 +1,7 @@
 package common
 
 import "strings"
+import "unicode"
 
 type Entity struct {
 	Name string
@@ -185,4 +186,22 @@ func MapSlice[T any, U any](items []T, mapFn func(T) U) []U {
 		mapped = append(mapped, mapFn(item))
 	}
 	return mapped
+}
+
+func StripEmojis(s string) string {
+	return strings.Map(func(r rune) rune {
+		if IsEmoji(r) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+func IsEmoji(r rune) bool {
+	return unicode.Is(unicode.So, r) ||
+		unicode.Is(unicode.Sk, r) ||
+		(r >= 0x1F000 && r <= 0x1FAFF) || // the big emoji block (😀🎉🐶 etc.)
+		(r >= 0x2600 && r <= 0x27BF) || // misc symbols & dingbats (☀️⚡ etc.)
+		r == 0x200D || // zero-width joiner (used in family emoji etc.)
+		(r >= 0xFE00 && r <= 0xFE0F)
 }
