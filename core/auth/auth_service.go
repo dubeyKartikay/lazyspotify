@@ -74,3 +74,9 @@ func (a *AuthService) GetSpotifyClient(tkn *oauth2.Token) *spotify.Client {
 	httpClient := a.sptAuth.Client(context.Background(), tkn)
 	return spotify.New(httpClient)
 }
+
+// OAuthHTTPClient returns an HTTP client that attaches the user's access token
+// and refreshes it the same way as the official Spotify Web API client.
+func (a *AuthService) OAuthHTTPClient(ctx context.Context, tkn *oauth2.Token) *http.Client {
+	return a.sptAuth.Client(ctx, tkn)
+}
