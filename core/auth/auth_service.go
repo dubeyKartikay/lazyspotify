@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
@@ -11,9 +12,10 @@ import (
 )
 
 type AuthService struct {
-	sptAuth    *spotifyauth.Authenticator
-	tknChannel chan *oauth2.Token
-	authConfig *AuthConfig
+	sptAuth        *spotifyauth.Authenticator
+	tknChannel     chan *oauth2.Token
+	authConfig     *AuthConfig
+	tokenDelivered sync.Once
 }
 
 func NewAuthService(redirectURI string) *AuthService {
@@ -65,7 +67,7 @@ func (a *AuthService) MakeOauthCallbackHandler() (func(w http.ResponseWriter, r 
 			return
 		}
 		_, _ = fmt.Fprintln(w, "Authentication successful. You can close this window.")
-		a.tknChannel <- tok
+		a.sendToken(tok)
 	}
 	return callback, errCh
 }
@@ -73,4 +75,10 @@ func (a *AuthService) MakeOauthCallbackHandler() (func(w http.ResponseWriter, r 
 func (a *AuthService) GetSpotifyClient(tkn *oauth2.Token) *spotify.Client {
 	httpClient := a.sptAuth.Client(context.Background(), tkn)
 	return spotify.New(httpClient)
+}
+
+// sendToken lets either the browser callback or pasted callback complete this
+// login once. A late result cannot leave another token queued after completion.
+func (a *AuthService) sendToken(tok *oauth2.Token) {
+	a.tokenDelivered.Do(func() { a.tknChannel <- tok })
 }
