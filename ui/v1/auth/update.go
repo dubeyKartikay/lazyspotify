@@ -29,9 +29,9 @@ func (m *Model) startAuthFlow() tea.Msg {
 func (m *Model) listenForAuthUpdates() tea.Msg {
 	updates := <-m.authFlowUpdates
 	if updates == "success" {
-		m.authState = Authenticated
+		return Authenticated
 	}
-	return m.authState
+	return Authenticating
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -63,6 +63,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case authQuitMsg:
 		return m, tea.Quit
 	case State:
+		m.authState = msg
+		if msg == Authenticated {
+			return m, nil
+		}
 		return m, m.listenForAuthUpdates
 	}
 	return m, nil
