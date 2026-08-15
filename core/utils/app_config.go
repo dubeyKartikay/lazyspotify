@@ -57,7 +57,6 @@ type AppConfig struct {
 		Daemon     struct {
 			Cmd             []string `mapstructure:"cmd"`
 			LogLevel        string   `mapstructure:"log_level"`
-			ZeroconfEnabled bool     `mapstructure:"zeroconf_enabled"`
 		} `mapstructure:"daemon"`
 	} `mapstructure:"librespot"`
 }
@@ -180,5 +179,4 @@ func applyConfigDefaults(v *viper.Viper) {
 	v.SetDefault("librespot.seek-step-ms", defaults.Librespot.SeekStepMs)
 	v.SetDefault("librespot.volume-step", defaults.Librespot.VolumeStep)
 	v.SetDefault("librespot.daemon.log_level", defaults.Librespot.Daemon.LogLevel)
-	v.SetDefault("librespot.daemon.zeroconf_enabled", defaults.Librespot.Daemon.ZeroconfEnabled)
 }

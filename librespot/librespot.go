@@ -27,7 +27,7 @@ func InitLibrespot(ctx context.Context, userId string, accessToken string, panic
 		return nil, err
 	}
 	librespotCommand = append(append([]string{}, librespotCommand...), "--config_dir", GetLibrespotConfigDir())
-	err = InitLibrespotConfig(ctx, userId, accessToken)
+	err = InitLibrespotConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
