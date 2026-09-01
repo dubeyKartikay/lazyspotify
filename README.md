@@ -121,6 +121,16 @@ export AUTH_CLIENT_ID=your_spotify_app_client_id
 
 If you change `auth.host`, `auth.port`, or `auth.redirect-endpoint`, update the Spotify app Redirect URI to match exactly.
 
+### Logging in over SSH
+
+You can complete the Web API OAuth login without SSH port forwarding:
+
+1. Run `lazyspotify` on the remote machine and open its login link in your local browser.
+2. Approve the Spotify login. The browser may show a connection error when it redirects to `http://127.0.0.1:8287/callback` on your local machine.
+3. Copy the **full URL from the address bar**, including `code` and `state`. In lazyspotify, press **p**, paste that URL using your terminal's paste shortcut, and press **Enter**.
+
+Keep the registered redirect URI as configured; no remote hostname is needed. The normal automatic callback still works locally or with an SSH tunnel. The remote machine still needs a working keyring. This fallback completes the Web API OAuth flow; it does not change player daemon authentication.
+
 ## Configuration
 
 Config file locations:
