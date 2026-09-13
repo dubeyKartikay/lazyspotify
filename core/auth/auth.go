@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	"github.com/zmb3/spotify/v2"
@@ -46,6 +48,14 @@ func (a *Authenticator) GetClient(ctx context.Context) (*spotify.Client, error) 
 		return nil, err
 	}
 	return a.authService.GetSpotifyClient(tkn), nil
+}
+
+func (a *Authenticator) OAuthHTTPClient(ctx context.Context) (*http.Client, error) {
+	tkn, err := a.GetAuthToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return a.authService.OAuthHTTPClient(ctx, tkn), nil
 }
 
 func (a *Authenticator) ReAuthenticate(ctx context.Context, updates chan<- string) (*oauth2.Token, error) {

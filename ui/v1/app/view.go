@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/dubeyKartikay/lazyspotify/ui/v1/lyricsview"
 )
 
 func (m *Model) View() tea.View {
@@ -21,7 +22,12 @@ func (m *Model) View() tea.View {
 		return m.authModel.View()
 	}
 
-	mediaCenterView := m.mediaCenter.View(m.width, m.height)
+	var mediaCenterView string
+	if m.lyricsViewOpen {
+		mediaCenterView = m.renderLyricsOverlay()
+	} else {
+		mediaCenterView = m.mediaCenter.View(m.width, m.height)
+	}
 	helpKeys := m.keys.WithMediaPanelOpen(m.mediaCenter.IsOpen()).WithInfoOpen(m.mediaCenter.InfoOpen())
 	helpLine := helpStyle.Width(m.width).Align(lipgloss.Center).Render(m.help.View(helpKeys))
 	if m.viewportTooSmall(mediaCenterView, helpLine) {
@@ -35,6 +41,26 @@ func (m *Model) View() tea.View {
 		layers = append(layers,lipgloss.NewLayer(helpLine).Y(m.height - lipgloss.Height(helpLine)).ID("help"))
 	}
 	return tea.NewView(lipgloss.NewCompositor(layers...).Render())
+}
+
+func (m *Model) renderLyricsOverlay() string {
+	display := m.mediaCenter.DisplayView(m.width)
+	player := m.mediaCenter.PlayerView()
+	dispH := lipgloss.Height(display)
+	playerH := lipgloss.Height(player)
+	bodyH := m.height - dispH - playerH - 1 // -1 for help line
+	if bodyH < 3 {
+		bodyH = 3
+	}
+	state := lyricsview.State{
+		Lines:    m.lyricsLines,
+		Idx:      m.currentLyricIdx(),
+		SyncType: m.lyricsSync,
+		Err:      m.lyricsErr,
+		Song:     m.songInfo,
+	}
+	body := lyricsview.Render(state, m.width, bodyH)
+	return lipgloss.JoinVertical(lipgloss.Left, display, body, player)
 }
 
 func (m *Model) viewportTooSmall(mediaCenterView, helpLine string) bool {

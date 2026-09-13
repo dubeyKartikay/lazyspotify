@@ -17,11 +17,13 @@ import (
 
 	"github.com/dubeyKartikay/lazyspotify/core/auth"
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
+	"github.com/dubeyKartikay/lazyspotify/core/lyricsexport"
 	coreplayer "github.com/dubeyKartikay/lazyspotify/core/player"
 	"github.com/dubeyKartikay/lazyspotify/core/ticker"
 	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	"github.com/dubeyKartikay/lazyspotify/librespot/models"
 	"github.com/dubeyKartikay/lazyspotify/spotify"
+	spotifylyrics "github.com/dubeyKartikay/lazyspotify/spotify/lyrics"
 )
 
 type Model struct {
@@ -40,6 +42,19 @@ type Model struct {
 	help               help.Model
 	keys               common.AppKeyMap
 	requestHandlers    map[common.MediaRequestKind]func(common.MediaRequest) tea.Cmd
+
+	lyricsLines        []spotifylyrics.Line
+	lyricsErr          string
+	lyricsSync         string
+	lyricsFetchPending string
+	lyricsBroadcaster  *lyricsexport.Broadcaster
+	lastSockLineIdx    int
+	lastSockTrackURI   string
+	lastSockPlaying    bool
+	lyricsViewOpen     bool
+
+	posAnchorMs   int
+	posAnchorWall time.Time
 }
 
 type mediaLoadedMsg struct {
@@ -78,6 +93,12 @@ type playerEventMsg struct {
 }
 
 type playerEventsClosedMsg struct{}
+
+type lyricsLoadMsg struct {
+	trackURI string
+	track    *spotifylyrics.Track
+	err      error
+}
 
 type playPauseOkMsg struct {
 	playing bool
@@ -162,6 +183,10 @@ func (m *Model) setSize(width, height int) {
 }
 
 func (m *Model) shutdown() {
+	if m.lyricsBroadcaster != nil {
+		m.lyricsBroadcaster.Close()
+		m.lyricsBroadcaster = nil
+	}
 	if m.player == nil {
 		return
 	}
@@ -209,6 +234,16 @@ func (m *Model) start() error {
 		logger.Log.Error().Err(err).Msg("failed to start player")
 		m.player = nil
 		return fmt.Errorf("failed to start librespot daemon: %w", err)
+	}
+
+	sockPath := strings.TrimSpace(utils.GetConfig().Lyrics.SocketPath)
+	if sockPath != "" {
+		b, err := lyricsexport.Start(sockPath)
+		if err != nil {
+			logger.Log.Warn().Err(err).Str("path", sockPath).Msg("lyrics socket not started")
+		} else {
+			m.lyricsBroadcaster = b
+		}
 	}
 	return nil
 }
@@ -288,26 +323,54 @@ func (m *Model) applyPlayerEvent(ev models.PlayerEvent) {
 		if ev.Metadata == nil {
 			return
 		}
+		prevURI := m.songInfo.TrackURI
 		artist := strings.Join(ev.Metadata.ArtistNames, ", ")
 		m.songInfo = common.SongInfo{
 			Title:    ev.Metadata.Name,
 			Artist:   artist,
 			Album:    ev.Metadata.AlbumName,
+			TrackURI: ev.Metadata.URI,
 			Position: ev.Metadata.Position,
 			Duration: ev.Metadata.Duration,
 		}
+		m.setPositionAnchor(ev.Metadata.Position)
 		m.mediaCenter.SetDisplayFromSong(m.songInfo)
+		if ev.Metadata.URI != prevURI {
+			if _, ok := spotifylyrics.TrackIDFromURI(ev.Metadata.URI); ok {
+				m.lyricsLines = nil
+				m.lyricsErr = ""
+				m.lyricsSync = ""
+				m.lyricsFetchPending = ev.Metadata.URI
+			} else {
+				m.lyricsLines = nil
+				m.lyricsErr = ""
+				m.lyricsSync = ""
+				m.lyricsFetchPending = ""
+			}
+		}
 	case models.EventTypePlaying:
+		m.setPositionAnchor(m.currentPositionMs())
 		m.playing = true
 	case models.EventTypePaused, models.EventTypeStopped:
+		frozen := m.currentPositionMs()
 		m.playing = false
 		if ev.Type == models.EventTypeStopped {
 			m.songInfo.Position = 0
+			m.songInfo.TrackURI = ""
+			m.setPositionAnchor(0)
+			m.lyricsLines = nil
+			m.lyricsErr = ""
+			m.lyricsSync = ""
+			m.lyricsFetchPending = ""
+		} else {
+			m.songInfo.Position = frozen
+			m.setPositionAnchor(frozen)
 		}
 	case models.EventTypeSeek:
 		if ev.Seek != nil {
 			m.songInfo.Position = ev.Seek.Position
 			m.songInfo.Duration = ev.Seek.Duration
+			m.setPositionAnchor(ev.Seek.Position)
 		}
 	case models.EventTypeVolume:
 		if ev.Volume != nil {
@@ -331,11 +394,34 @@ func (m *Model) previewVolume(delta int) {
 	m.volumeInfo.Volume = max(0, min(maxVolume, m.volumeInfo.Volume+delta))
 }
 
-func (m *Model) advancePlayback(elapsedMs int) {
-	if !m.playing || elapsedMs <= 0 || m.songInfo.Duration <= 0 {
+func (m *Model) setPositionAnchor(posMs int) {
+	if posMs < 0 {
+		posMs = 0
+	}
+	m.posAnchorMs = posMs
+	m.posAnchorWall = time.Now()
+}
+
+func (m *Model) currentPositionMs() int {
+	if !m.playing {
+		return m.posAnchorMs
+	}
+	if m.posAnchorWall.IsZero() {
+		return m.posAnchorMs
+	}
+	elapsed := int(time.Since(m.posAnchorWall) / time.Millisecond)
+	pos := m.posAnchorMs + elapsed
+	if m.songInfo.Duration > 0 && pos > m.songInfo.Duration {
+		pos = m.songInfo.Duration
+	}
+	return pos
+}
+
+func (m *Model) refreshPlaybackPosition() {
+	if m.songInfo.Duration <= 0 {
 		return
 	}
-	m.songInfo.Position = min(m.songInfo.Position+elapsedMs, m.songInfo.Duration)
+	m.songInfo.Position = m.currentPositionMs()
 	m.updatePlayerStatus()
 }
 
@@ -353,6 +439,65 @@ func (m *Model) updatePlayerStatus() {
 		MaxVolume:   maxVolume,
 		Shuffled:    m.player.Shuffled(),
 	})
+}
+
+func (m *Model) currentLyricIdx() int {
+	return spotifylyrics.CurrentLineIndex(m.lyricsLines, m.currentPositionMs())
+}
+
+func (m *Model) syncLyricsView() {
+	// Lyrics state lives on app.Model and is read by app/view.go when the
+	// lyrics view is open. Nothing else to do here — index is recomputed
+	// from the wall-clock anchor on each access.
+}
+
+func (m *Model) maybePublishLyricsSocket() {
+	if m.lyricsBroadcaster == nil {
+		return
+	}
+	idx := m.currentLyricIdx()
+	lineText := ""
+	if idx >= 0 && idx < len(m.lyricsLines) {
+		lineText = m.lyricsLines[idx].Words
+	}
+	if idx == m.lastSockLineIdx && m.songInfo.TrackURI == m.lastSockTrackURI && m.playing == m.lastSockPlaying {
+		return
+	}
+	m.lastSockLineIdx = idx
+	m.lastSockTrackURI = m.songInfo.TrackURI
+	m.lastSockPlaying = m.playing
+	errText := m.lyricsErr
+	m.lyricsBroadcaster.Publish(lyricsexport.Snapshot{
+		TrackURI:    m.songInfo.TrackURI,
+		Title:       m.songInfo.Title,
+		Artist:      m.songInfo.Artist,
+		PositionMs:  m.currentPositionMs(),
+		DurationMs:  m.songInfo.Duration,
+		Playing:     m.playing,
+		LineIndex:   idx,
+		LineText:    lineText,
+		SyncType:    m.lyricsSync,
+		LyricsError: errText,
+	})
+}
+
+func (m *Model) fetchLyricsCmd(trackURI, title, artist, album string, durationMs int) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		tkn, err := m.authModel.Authenticator().GetAuthToken(ctx)
+		if err != nil {
+			return lyricsLoadMsg{trackURI: trackURI, err: err}
+		}
+		if tkn == nil || tkn.AccessToken == "" {
+			return lyricsLoadMsg{trackURI: trackURI, err: fmt.Errorf("no access token for lyrics")}
+		}
+		client := spotifylyrics.HTTPClientForLyrics(tkn.AccessToken)
+		meta := spotifylyrics.LRCLIBTrackMeta{
+			Title: title, Artist: artist, Album: album, DurationMs: durationMs,
+		}
+		tr, err := spotifylyrics.FetchWithLRCLIBFallback(ctx, client, trackURI, meta)
+		return lyricsLoadMsg{trackURI: trackURI, track: tr, err: err}
+	}
 }
 
 func (m *Model) playPause() error {

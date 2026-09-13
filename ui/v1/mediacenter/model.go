@@ -87,6 +87,19 @@ func (m *Model) InfoOpen() bool {
 	return m.mediaPanel.InfoOpen()
 }
 
-func (m *Model)IsZenMode() bool {
+func (m *Model) IsZenMode() bool {
 	return m.zenMode
+}
+
+// DisplayView renders the now-playing strip sized to width. Used by the
+// lyrics overlay to keep the same header chrome visible.
+func (m *Model) DisplayView(width int) string {
+	m.displayScreen.SetSize(width, 3)
+	return m.displayScreen.View()
+}
+
+// PlayerView renders the player controls strip honoring zen mode. Used by
+// the lyrics overlay so the same controls remain visible underneath.
+func (m *Model) PlayerView() string {
+	return m.player.View(m.zenMode)
 }
