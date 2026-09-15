@@ -48,3 +48,18 @@ func readinessDeadline(deadline time.Time, code *models.DeviceAuth) time.Time {
 	}
 	return deadline
 }
+
+func (l *Librespot) StopReadiness() {
+	if l.cancelReadiness != nil {
+		l.cancelReadiness()
+	}
+}
+
+func (l *Librespot) publishAuthCode(code *models.DeviceAuth) {
+	// Keep the latest code even if the UI has not yet subscribed.
+	select {
+	case <-l.AuthCodes:
+	default:
+	}
+	l.AuthCodes <- code
+}

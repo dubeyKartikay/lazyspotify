@@ -2,6 +2,8 @@ package librespot
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -53,5 +55,68 @@ func TestPairingExtendsReadinessDeadline(t *testing.T) {
 	}
 	if !readinessDeadline(initial, nil).Equal(initial) {
 		t.Fatal("no pending pairing should preserve deadline")
+	}
+}
+
+func TestReadinessPublishesCodeAndCompletesAfterApproval(t *testing.T) {
+	approved := make(chan struct{})
+	c, closeServer := newTestLibrespotClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ready := false
+		select {
+		case <-approved:
+			ready = true
+		default:
+		}
+		if r.URL.Path == "/" {
+			if !ready {
+				t.Error("health requested while device approval is pending")
+			}
+			_ = json.NewEncoder(w).Encode(models.HealthResponse{PlaybackReady: ready})
+			return
+		}
+		if ready {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(models.DeviceAuth{URL: "https://spotify.com/pair", Code: "TEST", ExpiresAt: time.Now().Add(10 * time.Minute)})
+	}))
+	defer closeServer()
+	l := &Librespot{Client: c, Ready: make(chan error, 1), AuthCodes: make(chan *models.DeviceAuth, 1)}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go notifyWhenReady(ctx, l)
+	select {
+	case code := <-l.AuthCodes:
+		if code == nil || code.Code != "TEST" {
+			t.Fatalf("code = %+v", code)
+		}
+	case <-ctx.Done():
+		t.Fatal("no pairing code")
+	}
+	close(approved)
+	select {
+	case err := <-l.Ready:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-ctx.Done():
+		t.Fatal("not ready after approval")
+	}
+}
+
+func TestReadinessCancellation(t *testing.T) {
+	c, closeServer := newTestLibrespotClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) }))
+	defer closeServer()
+	l := &Librespot{Client: c, Ready: make(chan error, 1), AuthCodes: make(chan *models.DeviceAuth, 1)}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	go notifyWhenReady(ctx, l)
+	select {
+	case err := <-l.Ready:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("readiness did not stop")
 	}
 }

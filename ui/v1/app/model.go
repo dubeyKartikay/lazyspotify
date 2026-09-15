@@ -200,7 +200,7 @@ func (m *Model) start() error {
 		return err
 	}
 
-	m.player, err = coreplayer.NewPlayer(ctx, userID, token.AccessToken)
+	m.player, err = coreplayer.NewPlayer(ctx)
 	if err != nil {
 		logger.Log.Error().Err(err).Msg("failed to create player")
 		return err

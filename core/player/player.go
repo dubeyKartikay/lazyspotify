@@ -17,8 +17,8 @@ type Player struct {
 	shuffled  bool
 }
 
-func NewPlayer(ctx context.Context, userId string, accessToken string) (*Player, error) {
-	l, err := librespot.InitLibrespot(ctx, userId, accessToken, true)
+func NewPlayer(ctx context.Context) (*Player, error) {
+	l, err := librespot.InitLibrespot(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize librespot: %w", err)
 	}
@@ -208,6 +208,7 @@ func (p *Player) Destroy(ctx context.Context) {
 	if l.Events != nil {
 		l.Events.Close()
 	}
+	l.StopReadiness()
 	l.Daemon.StopDaemon()
 }
 
