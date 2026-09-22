@@ -107,6 +107,33 @@ func TestPlayTrackReturnsDaemonStatusErrors(t *testing.T) {
 	}
 }
 
+func TestPendingPairingReportsDaemonDeviceAuthCode(t *testing.T) {
+	status := http.StatusOK
+	body := `{"url":"https://spotify.com/pair?code=ABC123","code":"ABC123","expires_at":"2026-01-01T00:00:00Z"}`
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/code" {
+			t.Fatalf("path = %q, want /auth/code", r.URL.Path)
+		}
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	})
+
+	player, cleanup := newTestPlayer(t, handler)
+	defer cleanup()
+
+	url, code, ok := player.PendingPairing()
+	if !ok || url != "https://spotify.com/pair?code=ABC123" || code != "ABC123" {
+		t.Fatalf("PendingPairing() = %q, %q, %t, want pairing URL and code", url, code, ok)
+	}
+
+	status = http.StatusNoContent
+	body = ""
+	url, code, ok = player.PendingPairing()
+	if ok || url != "" || code != "" {
+		t.Fatalf("PendingPairing() = %q, %q, %t, want no pending pairing", url, code, ok)
+	}
+}
+
 func TestShuffleUpdatesCachedStateOnlyAfterSuccessfulDaemonResponse(t *testing.T) {
 	var status = http.StatusNoContent
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

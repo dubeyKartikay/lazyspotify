@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/librespot"
@@ -25,6 +26,30 @@ func NewPlayer(ctx context.Context) (*Player, error) {
 	return &Player{
 		librespot: l,
 	}, nil
+}
+
+func (p *Player) AuthCodes() <-chan *models.DeviceAuth {
+	if p == nil || p.librespot == nil {
+		return nil
+	}
+	return p.librespot.AuthCodes
+}
+
+// PendingPairing reports the daemon's outstanding device authorization code,
+// if any. It backs the post-login browser redirect that pairs the daemon in
+// the same browser session as the lazyspotify login.
+func (p *Player) PendingPairing() (string, string, bool) {
+	l, err := p.requireLibrespot()
+	if err != nil {
+		return "", "", false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	code, err := l.Client.GetAuthCode(ctx)
+	if err != nil || code == nil {
+		return "", "", false
+	}
+	return code.URL, code.Code, true
 }
 
 func (p *Player) requireLibrespot() (*librespot.Librespot, error) {
