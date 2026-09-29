@@ -75,6 +75,12 @@ func (a *Authenticator) GetAuthURL() string {
 	return a.authService.GetAuthURL()
 }
 
+// SetPostAuthRedirect registers a provider for a follow-up URL the browser
+// should be sent to after a successful login; see AuthService.SetPostAuthRedirect.
+func (a *Authenticator) SetPostAuthRedirect(provider func() (url string, code string, ok bool)) {
+	a.authService.SetPostAuthRedirect(provider)
+}
+
 func (a *Authenticator) saveToken(token *oauth2.Token) error {
 	return a.keyring.SetToken(a.tokenKey, token)
 }
