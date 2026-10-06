@@ -20,6 +20,9 @@ func (m *Model) View() tea.View {
 	if m.authModel != nil && m.authModel.State() < 2 {
 		return m.authModel.View()
 	}
+	if m.deviceAuth != nil {
+		return tea.NewView(m.deviceAuthView())
+	}
 
 	mediaCenterView := m.mediaCenter.View(m.width, m.height)
 	helpKeys := m.keys.WithMediaPanelOpen(m.mediaCenter.IsOpen()).WithInfoOpen(m.mediaCenter.InfoOpen())
