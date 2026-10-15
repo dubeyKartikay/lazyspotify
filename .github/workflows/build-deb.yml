@@ -11,7 +11,10 @@ on:
         description: "Ubuntu series to target"
         required: true
         default: "noble"
-        type: string
+        type: choice
+        options:
+          - noble
+          - resolute
       build_mode:
         description: "Package mode"
         required: true
@@ -26,7 +29,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     container:
-      image: ubuntu:${{ inputs.ubuntu_series == 'questing' && '25.10' || '24.04' }}
+      image: ubuntu:${{ inputs.ubuntu_series == 'resolute' && '26.04' || '24.04' }}
 
     steps:
       - name: Checkout
@@ -53,6 +56,7 @@ jobs:
             golang-any \
             libasound2-dev \
             libflac-dev \
+            libmpg123-dev \
             libogg-dev \
             libvorbis-dev \
             pkgconf

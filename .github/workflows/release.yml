@@ -31,7 +31,10 @@ jobs:
           go-version-file: go.mod
 
       - name: Validate release manifest
-        run: scripts/release/validate-manifest.sh --require-daemon-tag
+        run: |
+          scripts/release/validate-manifest.sh --require-daemon-tag
+          test "${GITHUB_REF_NAME}" = "v$(awk -F': ' '$1=="lazyspotify_version" {gsub(/"/, "", $2); print $2}' packaging/release-manifest.yaml)"
+          test -s "docs/releases/${GITHUB_REF_NAME}.md"
 
       - name: Capture release metadata
         id: meta
@@ -52,6 +55,49 @@ jobs:
           name: source-bundle
           path: dist/*.tar.gz
 
+  verify-source:
+    needs: prepare
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install daemon test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libasound2-dev libflac-dev libmpg123-dev libogg-dev libvorbis-dev pkgconf
+
+      - name: Download source bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: source-bundle
+          path: dist
+
+      - name: Extract bundled source archive
+        run: |
+          mkdir -p bundle
+          tar -C bundle -xzf "dist/${{ needs.prepare.outputs.source_bundle_name }}"
+
+      - name: Test vendored app and daemon sources offline
+        working-directory: bundle/${{ needs.prepare.outputs.source_bundle_dir }}
+        env:
+          GOWORK: "off"
+          GOFLAGS: "-mod=vendor"
+          GOPROXY: "off"
+          GOSUMDB: "off"
+        run: |
+          go vet ./...
+          go test ./...
+          cd third_party/go-librespot
+          go vet -tags "test_unit test_integration" ./...
+          go test -tags "test_unit test_integration" ./...
+
   build-linux:
     needs: prepare
     strategy:
@@ -59,8 +105,8 @@ jobs:
         include:
           - series: noble
             container: ubuntu:24.04
-          - series: questing
-            container: ubuntu:25.10
+          - series: resolute
+            container: ubuntu:26.04
     runs-on: ubuntu-24.04
     container:
       image: ${{ matrix.container }}
@@ -88,6 +134,7 @@ jobs:
             golang-any \
             libasound2-dev \
             libflac-dev \
+            libmpg123-dev \
             libogg-dev \
             libvorbis-dev \
             pkgconf
@@ -135,6 +182,7 @@ jobs:
             go \
             libogg \
             libvorbis \
+            mpg123 \
             tar
 
       - name: Checkout
@@ -168,7 +216,7 @@ jobs:
     needs: prepare
     runs-on: ubuntu-24.04
     container:
-      image: fedora:42
+      image: fedora:44
 
     steps:
       - name: Install Fedora build dependencies
@@ -182,6 +230,7 @@ jobs:
             go \
             libogg-devel \
             libvorbis-devel \
+            mpg123-devel \
             rpm-build \
             tar
 
@@ -231,7 +280,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Install build dependencies
-        run: brew install flac libogg libvorbis pkgconf
+        run: brew install flac libogg libvorbis mpg123 pkgconf
 
       - name: Download source bundle
         uses: actions/download-artifact@v4
@@ -308,6 +357,7 @@ jobs:
   draft-release:
     needs:
       - prepare
+      - verify-source
       - build-linux
       - build-arch
       - build-rpm
@@ -340,6 +390,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: true
+          body_path: docs/releases/v${{ needs.prepare.outputs.release_version }}.md
           files: release/*
 
   update-homebrew-tap:
@@ -601,7 +652,7 @@ jobs:
       - update-aur
       - upload-ppa
       - submit-copr
-    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ always() && needs.draft-release.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on: ubuntu-24.04
 
     steps:

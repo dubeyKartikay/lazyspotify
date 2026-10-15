@@ -111,7 +111,10 @@ default_daemon_version() {
 
   local commit
   commit="$(daemon_commit)"
-  printf 'daemon-%s\n' "${commit:0:12}"
+  # go-librespot also sends this as client_version to Spotify's client-token
+  # endpoint. An arbitrary label such as daemon-<sha> is rejected with HTTP 400;
+  # retain the source revision in the daemon's numeric version format instead.
+  printf '0.0.0.g%s\n' "${commit:0:12}"
 }
 
 github_repository() {

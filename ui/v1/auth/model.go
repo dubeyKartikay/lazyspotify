@@ -37,16 +37,16 @@ func NewModel() *Model {
 	}
 }
 
-func (m *Model) State() State {
-	return m.authState
-}
-
 func newPasteInput() textinput.Model {
 	input := textinput.New()
 	input.Prompt = "Callback: "
 	input.Placeholder = "paste the redirected browser url here"
 	input.CharLimit = 2048
 	return input
+}
+
+func (m *Model) State() State {
+	return m.authState
 }
 
 func (m *Model) EnteringCallback() bool {

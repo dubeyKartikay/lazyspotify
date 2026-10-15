@@ -78,6 +78,9 @@ cp "${daemon_source_dir}/LICENSE" "${artifact_dir}/LICENSE.go-librespot"
 cp "${source_dir}/README.md" "${artifact_dir}/README.md"
 
 cat > "${artifact_dir}/INSTALL.txt" <<EOF
+Runtime audio libraries are required. With Homebrew, install them using:
+  brew install flac libogg libvorbis mpg123
+
 This archive ships both binaries, but it does not install them into a fixed
 system path. After extracting the archive, set librespot.daemon.cmd in your
 lazyspotify config so the app can find lazyspotify-librespot.

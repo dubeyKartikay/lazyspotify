@@ -122,7 +122,7 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	case daemonRestartErrMsg:
 		err := fmt.Errorf("librespot daemon exited and could not be restarted: %w", msg.err)
 		if !m.playerReady {
-			err = fmt.Errorf("%w; see daemon.log in the config directory, and make sure the daemon is a lazyspotify-librespot build with device authorization support", err)
+			err = fmt.Errorf("%w; see daemon.log in the config directory for the full output", err)
 		}
 		return m.setFatalError(err), true
 	case playerEventMsg:

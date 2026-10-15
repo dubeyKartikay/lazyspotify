@@ -5,11 +5,16 @@ class Lazyspotify < Formula
   sha256 "@SOURCE_SHA256@"
   license all_of: ["MIT", "GPL-3.0-only"]
 
-  depends_on "flac" => :build
+  depends_on "flac"
   depends_on "go" => :build
-  depends_on "libogg" => :build
-  depends_on "libvorbis" => :build
+  depends_on "libogg"
+  depends_on "libvorbis"
+  depends_on "mpg123"
   depends_on "pkgconf" => :build
+
+  on_linux do
+    depends_on "alsa-lib"
+  end
 
   def install
     daemon_path = opt_libexec/"lazyspotify-librespot"
