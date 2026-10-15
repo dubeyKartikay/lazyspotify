@@ -22,7 +22,20 @@ func (m *Model) View() tea.View {
 			hintColor = lipgloss.BrightGreen
 		}
 		hint := lipgloss.NewStyle().Foreground(hintColor).MarginTop(3).Render(hintText)
-		return tea.NewView(lipgloss.JoinVertical(lipgloss.Left, head, msg, styledURL, hint))
+		remoteHint := lipgloss.NewStyle().Foreground(lipgloss.BrightBlack).Render("browser can't reach this machine? after approving, copy the address bar url and press p to paste it")
+		lines := []string{head, msg, styledURL, hint, remoteHint}
+		if m.pasteFocused {
+			input := lipgloss.NewStyle().MarginTop(2).Render(m.pasteInput.View())
+			inputHint := lipgloss.NewStyle().Foreground(lipgloss.BrightBlack).Render("enter: submit • esc: cancel")
+			if m.pasteSubmitting {
+				inputHint = "Completing login…"
+			}
+			lines = append(lines, input, inputHint)
+		}
+		if m.pasteErr != nil {
+			lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.BrightRed).Render(m.pasteErr.Error()))
+		}
+		return tea.NewView(lipgloss.JoinVertical(lipgloss.Left, lines...))
 	}
 	return tea.NewView("Authenticating with Spotify")
 }

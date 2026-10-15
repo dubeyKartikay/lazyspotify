@@ -84,3 +84,10 @@ func (a *Authenticator) SetPostAuthRedirect(provider func() (url string, code st
 func (a *Authenticator) saveToken(token *oauth2.Token) error {
 	return a.keyring.SetToken(a.tokenKey, token)
 }
+
+// CompleteLoginWithPastedCallback finishes the login from a callback value the
+// user pasted back, for browsers that cannot reach the callback server.
+func (a *Authenticator) CompleteLoginWithPastedCallback(ctx context.Context, pasted string) error {
+	_, err := a.authService.ExchangePastedCallback(ctx, pasted)
+	return err
+}

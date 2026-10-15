@@ -49,6 +49,9 @@ func (m *Model) handleShellInput(msg tea.Msg) (tea.Cmd, bool) {
 	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, m.keys.ToggleHelp):
+			if m.authModel != nil && m.authModel.State() < uiauth.Authenticated && m.authModel.EnteringCallback() {
+				return nil, false
+			}
 			m.help.ShowAll = !m.help.ShowAll
 			return nil, true
 		case key.Matches(msg, m.keys.Quit):

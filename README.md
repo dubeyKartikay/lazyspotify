@@ -131,6 +131,14 @@ Spotify deprecated the token-based login the player daemon previously used, so l
 
 The token from your own client ID is only used for Web API requests (playlists, search, library). The player daemon authenticates itself through Spotify's device authorization flow, so it no longer depends on your client ID or token.
 
+### Logging in over SSH
+
+You can complete the Web API OAuth login without SSH port forwarding:
+
+1. Run `lazyspotify` on the remote machine and open its login link in your local browser.
+2. Approve the Spotify login. The browser may show a connection error when it redirects to `http://127.0.0.1:8287/callback` on your local machine.
+3. Copy the **full URL from the address bar**, including `code` and `state`. In lazyspotify, press **p**, paste that URL using your terminal's paste shortcut, and press **Enter**.
+
 ## Configuration
 
 Config file locations:
