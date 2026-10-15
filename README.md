@@ -18,7 +18,7 @@
 
 - A Spotify Premium account.
 - A working system keyring.
-- The patched `lazyspotify-librespot` daemon (only if you are installing from source or running an unpackaged build)
+- The patched `lazyspotify-librespot` daemon with device authorization support (only if you are installing from source or running an unpackaged build).
 - On Linux, one of `wl-clipboard`, `xclip`, or `xsel` if you want clipboard support on the auth screen.
 
 ## Install
@@ -120,6 +120,16 @@ export AUTH_CLIENT_ID=your_spotify_app_client_id
 ```
 
 If you change `auth.host`, `auth.port`, or `auth.redirect-endpoint`, update the Spotify app Redirect URI to match exactly.
+
+## Logging In
+
+Spotify deprecated the token-based login the player daemon previously used, so lazyspotify now signs you in once per browser session:
+
+1. Start `lazyspotify`. On the first run you are asked to log in with your Spotify account through the browser (this uses your own client ID from the section above and powers browsing).
+2. After you approve, the same browser page continues straight to Spotify's device pairing screen with the code already filled in. Approve the pairing to connect the player daemon.
+3. The daemon stores its own credentials. On later runs lazyspotify starts silently: the login token comes from your keyring and the player reuses the daemon's stored credentials. You only see the pairing screen again if Spotify invalidated the stored credentials.
+
+The token from your own client ID is only used for Web API requests (playlists, search, library). The player daemon authenticates itself through Spotify's device authorization flow, so it no longer depends on your client ID or token.
 
 ## Configuration
 
