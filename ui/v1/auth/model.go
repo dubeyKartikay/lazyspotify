@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"charm.land/bubbles/v2/textinput"
+
 	"github.com/dubeyKartikay/lazyspotify/core/auth"
 )
 
@@ -20,6 +22,10 @@ type Model struct {
 	width           int
 	height          int
 	copied          bool
+	pasteInput      textinput.Model
+	pasteFocused    bool
+	pasteErr        error
+	pasteSubmitting bool
 }
 
 func NewModel() *Model {
@@ -27,11 +33,24 @@ func NewModel() *Model {
 		authState:       Authenticated,
 		auth:            auth.New(),
 		authFlowUpdates: make(chan string),
+		pasteInput:      newPasteInput(),
 	}
 }
 
 func (m *Model) State() State {
 	return m.authState
+}
+
+func newPasteInput() textinput.Model {
+	input := textinput.New()
+	input.Prompt = "Callback: "
+	input.Placeholder = "paste the redirected browser url here"
+	input.CharLimit = 2048
+	return input
+}
+
+func (m *Model) EnteringCallback() bool {
+	return m.pasteFocused
 }
 
 func (m *Model) SetState(state State) {
@@ -45,4 +64,5 @@ func (m *Model) Authenticator() *auth.Authenticator {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
+	m.pasteInput.SetWidth(max(0, width-14))
 }
