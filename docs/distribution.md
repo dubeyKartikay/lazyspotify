@@ -50,16 +50,41 @@
 ## Release sequence
 
 1. Tag the patched daemon repo and update `packaging/release-manifest.yaml`.
-2. Tag `lazyspotify` with `vX.Y.Z`.
-3. Let `release.yml` build the source bundle, package artifacts, and draft the
-   GitHub Release.
-4. The workflow updates the Homebrew tap and AUR metadata, uploads the Debian
+2. Set `lazyspotify_version` in the manifest.
+   Commit and merge the release changes before tagging: the source bundle is
+   exported from Git `HEAD`, so uncommitted edits are not included.
+3. Tag `lazyspotify` with `vX.Y.Z`. The workflow checks that the tag matches the
+   manifest version.
+4. Let `release.yml` build the source bundle, package artifacts, and draft the
+   GitHub Release with GitHub-generated release notes. Before drafting, it vets
+   and tests both vendored source trees
+   with network module downloads disabled, including the daemon's tagged unit
+   and integration tests.
+5. The workflow updates the Homebrew tap and AUR metadata, uploads the Debian
    source package to Launchpad when the signing secrets are present, and
    submits the Fedora source RPM to COPR when the COPR config is present.
-5. The workflow publishes the GitHub Release after those jobs succeed or are
+6. The workflow publishes the GitHub Release after those jobs succeed or are
    intentionally skipped.
 
-## Launchpad secrets
+## Optional publishing configuration
+
+GitHub release assets use the workflow's built-in token. Additional channels
+are enabled when their credentials are configured:
+
+- Homebrew: `HOMEBREW_TAP_REPO_TOKEN`.
+- AUR: `AUR_SSH_PRIVATE_KEY`.
+- macOS signing: `APPLE_DEVELOPER_ID_APP_CERT_B64`,
+  `APPLE_DEVELOPER_ID_APP_CERT_PASSWORD`, and
+  `APPLE_DEVELOPER_ID_APP_CERT_COMMON_NAME`.
+- macOS notarization: `APPLE_NOTARY_APPLE_ID`, `APPLE_NOTARY_TEAM_ID`, and
+  `APPLE_NOTARY_APP_PASSWORD`. Without signing/notarization configuration,
+  the workflow produces an unsigned macOS archive.
+- COPR: `COPR_CONFIG` and `COPR_PROJECT`.
+
+### Launchpad
+
+Launchpad requires `LAUNCHPAD_PPA`, `LAUNCHPAD_GPG_PRIVATE_KEY`, and
+`LAUNCHPAD_GPG_KEY_ID`; use `LAUNCHPAD_GPG_PASSPHRASE` for a protected signing key.
 
 - `LAUNCHPAD_PPA` must be set to `owner/archive`, matching the documented
   Launchpad upload target `dput ppa:owner/archive`.
@@ -70,9 +95,10 @@
 ## Ubuntu series
 
 - The release workflow currently publishes Launchpad source packages for
-  `noble` (Ubuntu 24.04 LTS) and `questing` (Ubuntu 25.10).
+  `noble` (Ubuntu 24.04 LTS) and `resolute` (Ubuntu 26.04 LTS).
 - Each series is built and uploaded separately so the PPA receives a
-  series-specific source version such as `...~noble1` or `...~questing1`.
+  series-specific source version such as `...~noble1` or `...~resolute1`.
+- Fedora RPMs are built in a Fedora 44 container.
 
 ## Arch packaging
 

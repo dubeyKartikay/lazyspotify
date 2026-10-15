@@ -9,6 +9,7 @@ Build-Depends:
  golang-any,
  libasound2-dev,
  libflac-dev,
+ libmpg123-dev,
  libogg-dev,
  libvorbis-dev,
  pkgconf

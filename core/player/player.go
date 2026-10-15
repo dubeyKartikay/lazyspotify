@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/librespot"
@@ -17,14 +18,38 @@ type Player struct {
 	shuffled  bool
 }
 
-func NewPlayer(ctx context.Context, userId string, accessToken string) (*Player, error) {
-	l, err := librespot.InitLibrespot(ctx, userId, accessToken, true)
+func NewPlayer(ctx context.Context) (*Player, error) {
+	l, err := librespot.InitLibrespot(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize librespot: %w", err)
 	}
 	return &Player{
 		librespot: l,
 	}, nil
+}
+
+func (p *Player) AuthCodes() <-chan *models.DeviceAuth {
+	if p == nil || p.librespot == nil {
+		return nil
+	}
+	return p.librespot.AuthCodes
+}
+
+// PendingPairing reports the daemon's outstanding device authorization code,
+// if any. It backs the post-login browser redirect that pairs the daemon in
+// the same browser session as the lazyspotify login.
+func (p *Player) PendingPairing() (string, string, bool) {
+	l, err := p.requireLibrespot()
+	if err != nil {
+		return "", "", false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	code, err := l.Client.GetAuthCode(ctx)
+	if err != nil || code == nil {
+		return "", "", false
+	}
+	return code.URL, code.Code, true
 }
 
 func (p *Player) requireLibrespot() (*librespot.Librespot, error) {
@@ -208,6 +233,7 @@ func (p *Player) Destroy(ctx context.Context) {
 	if l.Events != nil {
 		l.Events.Close()
 	}
+	l.StopReadiness()
 	l.Daemon.StopDaemon()
 }
 

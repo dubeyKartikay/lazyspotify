@@ -75,8 +75,10 @@ func (a *Authenticator) GetAuthURL() string {
 	return a.authService.GetAuthURL()
 }
 
-func (a *Authenticator) saveToken(token *oauth2.Token) error {
-	return a.keyring.SetToken(a.tokenKey, token)
+// SetPostAuthRedirect registers a provider for a follow-up URL the browser
+// should be sent to after a successful login; see AuthService.SetPostAuthRedirect.
+func (a *Authenticator) SetPostAuthRedirect(provider func() (url string, code string, ok bool)) {
+	a.authService.SetPostAuthRedirect(provider)
 }
 
 // CompleteLoginWithPastedCallback finishes the login from a callback value the
@@ -84,4 +86,8 @@ func (a *Authenticator) saveToken(token *oauth2.Token) error {
 func (a *Authenticator) CompleteLoginWithPastedCallback(ctx context.Context, pasted string) error {
 	_, err := a.authService.ExchangePastedCallback(ctx, pasted)
 	return err
+}
+
+func (a *Authenticator) saveToken(token *oauth2.Token) error {
+	return a.keyring.SetToken(a.tokenKey, token)
 }

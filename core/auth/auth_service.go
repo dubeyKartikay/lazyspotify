@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"html"
 	"net/http"
 	"sync"
 
@@ -12,10 +13,11 @@ import (
 )
 
 type AuthService struct {
-	sptAuth        *spotifyauth.Authenticator
-	tknChannel     chan *oauth2.Token
-	authConfig     *AuthConfig
-	tokenDelivered sync.Once
+	sptAuth          *spotifyauth.Authenticator
+	tknChannel       chan *oauth2.Token
+	authConfig       *AuthConfig
+	postAuthRedirect func() (url string, code string, ok bool)
+	tokenDelivered   sync.Once
 }
 
 func NewAuthService(redirectURI string) *AuthService {
@@ -52,6 +54,14 @@ func (a *AuthService) GetTokenChannel() chan *oauth2.Token {
 	return a.tknChannel
 }
 
+// SetPostAuthRedirect registers a provider for a follow-up URL the browser
+// should be sent to after a successful login. lazyspotify uses it to route the
+// user straight to the daemon's device pairing page in the same browser
+// session, so the player is connected without a second login.
+func (a *AuthService) SetPostAuthRedirect(provider func() (url string, code string, ok bool)) {
+	a.postAuthRedirect = provider
+}
+
 func (a *AuthService) MakeOauthCallbackHandler() (func(w http.ResponseWriter, r *http.Request), chan error) {
 	errCh := make(chan error, 1)
 	callback := func(w http.ResponseWriter, r *http.Request) {
@@ -66,15 +76,10 @@ func (a *AuthService) MakeOauthCallbackHandler() (func(w http.ResponseWriter, r 
 			errCh <- fmt.Errorf("state mismatch: %s != %s", st, a.authConfig.state)
 			return
 		}
-		_, _ = fmt.Fprintln(w, "Authentication successful. You can close this window.")
+		a.writeSuccess(w)
 		a.sendToken(tok)
 	}
 	return callback, errCh
-}
-
-func (a *AuthService) GetSpotifyClient(tkn *oauth2.Token) *spotify.Client {
-	httpClient := a.sptAuth.Client(context.Background(), tkn)
-	return spotify.New(httpClient)
 }
 
 // ExchangePastedCallback completes the login from a callback value the user
@@ -96,4 +101,36 @@ func (a *AuthService) ExchangePastedCallback(ctx context.Context, pasted string)
 // login once. A late result cannot leave another token queued after completion.
 func (a *AuthService) sendToken(tok *oauth2.Token) {
 	a.tokenDelivered.Do(func() { a.tknChannel <- tok })
+}
+
+func (a *AuthService) writeSuccess(w http.ResponseWriter) {
+	if a.postAuthRedirect != nil {
+		if url, code, ok := a.postAuthRedirect(); ok {
+			writePairingRedirect(w, url, code)
+			return
+		}
+	}
+	_, _ = fmt.Fprintln(w, "Authentication successful. You can close this window.")
+}
+
+func writePairingRedirect(w http.ResponseWriter, url string, code string) {
+	safeURL := html.EscapeString(url)
+	safeCode := html.EscapeString(code)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="refresh" content="0; url=%s">
+</head>
+<body>
+<p>Authentication successful. Pairing the player...</p>
+<p>Redirecting to <a href="%s">finish pairing the player</a>. Enter this code if prompted: <strong>%s</strong></p>
+</body>
+</html>
+`, safeURL, safeURL, safeCode)
+}
+
+func (a *AuthService) GetSpotifyClient(tkn *oauth2.Token) *spotify.Client {
+	httpClient := a.sptAuth.Client(context.Background(), tkn)
+	return spotify.New(httpClient)
 }

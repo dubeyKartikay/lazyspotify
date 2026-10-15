@@ -15,7 +15,6 @@ import (
 	"github.com/dubeyKartikay/lazyspotify/ui/v1/mediacenter"
 	"github.com/dubeyKartikay/lazyspotify/ui/v1/player"
 
-	"github.com/dubeyKartikay/lazyspotify/core/auth"
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	coreplayer "github.com/dubeyKartikay/lazyspotify/core/player"
 	"github.com/dubeyKartikay/lazyspotify/core/ticker"
@@ -34,6 +33,8 @@ type Model struct {
 	fatalErr           error
 	player             *coreplayer.Player
 	spotifyClient      *spotify.SpotifyClient
+	deviceAuth         *models.DeviceAuth
+	deviceAuthHint     string
 	mediaCenter        mediacenter.Model
 	width              int
 	height             int
@@ -176,6 +177,22 @@ func (m *Model) start() error {
 		m.authModel.SetSize(m.width, m.height)
 	}
 
+	if m.player == nil {
+		m.player, err = coreplayer.NewPlayer(ctx)
+		if err != nil {
+			logger.Log.Error().Err(err).Msg("failed to create player")
+			return err
+		}
+		if err := m.player.Start(ctx); err != nil {
+			m.player = nil
+			return fmt.Errorf("failed to start librespot daemon: %w", err)
+		}
+	}
+	// Route the browser to the daemon's pairing page right after the
+	// lazyspotify login so the player is connected in the same browser
+	// session instead of asking the user to log in a second time.
+	m.authModel.Authenticator().SetPostAuthRedirect(m.player.PendingPairing)
+
 	m.spotifyClient, err = spotify.NewSpotifyClient(ctx, m.authModel.Authenticator())
 	if err != nil {
 		if spotify.IsAuthError(err) {
@@ -186,30 +203,14 @@ func (m *Model) start() error {
 	}
 
 	userID, err := m.spotifyClient.GetUserID(ctx)
-	logger.Log.Info().Str("user id", userID).Msg("got user id")
 	if err != nil {
 		if spotify.IsAuthError(err) {
 			m.authModel.SetState(uiauth.NeedsAuth)
 		}
 		return err
 	}
+	logger.Log.Info().Str("user id", userID).Msg("got user id")
 
-	token, err := auth.New().GetAuthToken(ctx)
-	if err != nil || token == nil {
-		m.authModel.SetState(uiauth.NeedsAuth)
-		return err
-	}
-
-	m.player, err = coreplayer.NewPlayer(ctx, userID, token.AccessToken)
-	if err != nil {
-		logger.Log.Error().Err(err).Msg("failed to create player")
-		return err
-	}
-	if err := m.player.Start(ctx); err != nil {
-		logger.Log.Error().Err(err).Msg("failed to start player")
-		m.player = nil
-		return fmt.Errorf("failed to start librespot daemon: %w", err)
-	}
 	return nil
 }
 

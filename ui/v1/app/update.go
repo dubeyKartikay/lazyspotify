@@ -23,6 +23,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.fatalErr != nil {
 		return m, nil
 	}
+	if m.deviceAuth != nil {
+		return m, m.handleDeviceAuthInput(msg)
+	}
 	centerCmd := m.mediaCenter.Update(msg)
 
 	if m.authModel != nil && m.authModel.State() < uiauth.Authenticated {
@@ -63,6 +66,19 @@ func (m *Model) handleShellInput(msg tea.Msg) (tea.Cmd, bool) {
 
 func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
+	case deviceAuthMsg:
+		if m.playerReady {
+			return nil, true
+		}
+		m.deviceAuth = msg.code
+		m.deviceAuthHint = ""
+		return m.waitForDeviceAuth(), true
+	case deviceAuthCopiedMsg:
+		m.deviceAuthHint = "Pairing link copied"
+		if msg.err != nil {
+			m.deviceAuthHint = "Could not copy; open the link above"
+		}
+		return nil, true
 	case fatalErrMsg:
 		return m.setFatalError(msg.err), true
 	case fatalQuitMsg:
@@ -95,15 +111,20 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		requestCmd := tea.Cmd(func() tea.Msg {
 			return common.RootMediaRequestForListKind(common.Playlists, "")
 		})
-		return tea.Batch(m.waitForPlayerReady(), m.waitForPlayerEvent(), m.waitForDaemonRestartFailure(), requestCmd), true
+		return tea.Batch(m.waitForPlayerReady(), m.waitForPlayerEvent(), m.waitForDaemonRestartFailure(), m.waitForDeviceAuth(), requestCmd), true
 	case playerReadyMsg:
+		m.deviceAuth = nil
 		m.playerReady = true
 		m.updatePlayerStatus()
 		return nil, true
 	case playerReadyErrMsg:
 		return m.setFatalError(fmt.Errorf("librespot daemon did not become ready: %w", msg.err)), true
 	case daemonRestartErrMsg:
-		return m.setFatalError(fmt.Errorf("librespot daemon exited and could not be restarted: %w", msg.err)), true
+		err := fmt.Errorf("librespot daemon exited and could not be restarted: %w", msg.err)
+		if !m.playerReady {
+			err = fmt.Errorf("%w; see daemon.log in the config directory for the full output", err)
+		}
+		return m.setFatalError(err), true
 	case playerEventMsg:
 		m.applyPlayerEvent(msg.event)
 		m.updatePlayerStatus()

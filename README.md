@@ -18,7 +18,8 @@
 
 - A Spotify Premium account.
 - A working system keyring.
-- The patched `lazyspotify-librespot` daemon (only if you are installing from source or running an unpackaged build)
+- The patched `lazyspotify-librespot` daemon with device authorization support (only if you are installing from source or running an unpackaged build).
+- For macOS source or ZIP installs, install the runtime audio libraries with `brew install flac libogg libvorbis mpg123`. Homebrew package installs handle these dependencies automatically.
 - On Linux, one of `wl-clipboard`, `xclip`, or `xsel` if you want clipboard support on the auth screen.
 
 ## Install
@@ -48,9 +49,9 @@ nix run nixpkgs#lazyspotify
 
 Download the latest package from [GitHub Releases](https://github.com/dubeyKartikay/lazyspotify/releases).
 
-- macOS: signed `.zip`
+- macOS: `.zip`
 - Ubuntu/Debian: `.deb`
-- Fedora/RHEL: `.rpm`
+- Fedora: `.rpm`
 - Arch: `.tar.gz`
 
 Example package installs:
@@ -121,13 +122,23 @@ export AUTH_CLIENT_ID=your_spotify_app_client_id
 
 If you change `auth.host`, `auth.port`, or `auth.redirect-endpoint`, update the Spotify app Redirect URI to match exactly.
 
+## Logging In
+
+Spotify deprecated the token-based login the player daemon previously used, so lazyspotify now signs you in once per browser session:
+
+1. Start `lazyspotify`. On the first run you are asked to log in with your Spotify account through the browser (this uses your own client ID from the section above and powers browsing).
+2. After you approve, the same browser page continues straight to Spotify's device pairing screen with the code already filled in. Approve the pairing to connect the player daemon.
+3. The daemon stores its own credentials. On later runs lazyspotify starts silently: the login token comes from your keyring and the player reuses the daemon's stored credentials. You only see the pairing screen again if Spotify invalidated the stored credentials.
+
+The token from your own client ID is only used for Web API requests (playlists, search, library). The player daemon authenticates itself through Spotify's device authorization flow, so it no longer depends on your client ID or token.
+
 ### Logging in over SSH
 
-You can complete the Web API OAuth login without SSH port forwarding:
-
 1. Run `lazyspotify` on the remote machine and open its login link in your local browser.
-2. Approve the Spotify login. The browser may show a connection error when it redirects to `http://127.0.0.1:8287/callback` on your local machine.
-3. Copy the **full URL from the address bar**, including `code` and `state`. In lazyspotify, press **p**, paste that URL using your terminal's paste shortcut, and press **Enter**.
+2. Approve the Spotify login. The browser may show a connection error when it redirects to `http://127.0.0.1:8287/callback` on your local machine. Leave that tab open.
+3. Copy the **full URL from the address bar**. In lazyspotify, press **p**, paste that URL using your terminal's paste shortcut, and press **Enter**.
+4. If the player needs pairing, lazyspotify shows a Spotify pairing link and code. Open that link in the same browser and approve the pairing. The pairing page is hosted by Spotify and works from any machine.
+
 
 ## Configuration
 
