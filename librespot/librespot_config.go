@@ -18,11 +18,10 @@ type LibrespotConfig struct {
 	AudioBackend    string `yaml:"audio_backend"`
 	DeviceName      string `yaml:"device_name"`
 	Credentials     struct {
-		Type         string `yaml:"type"`
-		SpotifyToken struct {
-			Username    string `yaml:"username"`
-			AccessToken string `yaml:"access_token"`
-		} `yaml:"spotify_token"`
+		Type     string `yaml:"type"`
+		Zeroconf struct {
+			PersistCredentials bool `yaml:"persist_credentials"`
+		} `yaml:"zeroconf"`
 	} `yaml:"credentials"`
 	Server struct {
 		Enabled     bool   `yaml:"enabled"`
@@ -46,8 +45,8 @@ func GetLibrespotConfigFile() string {
 	return filepath.Join(GetLibrespotConfigDir(), "config.yml")
 }
 
-func InitLibrespotConfig(ctx context.Context, userId string, accessToken string) error {
-	librespotConfig := makeLibrespotConfig(utils.GetConfig(), userId, accessToken)
+func InitLibrespotConfig(ctx context.Context) error {
+	librespotConfig := makeLibrespotConfig(utils.GetConfig())
 	configYaml, err := yaml.Marshal(librespotConfig)
 	if err != nil {
 		return err
@@ -55,17 +54,21 @@ func InitLibrespotConfig(ctx context.Context, userId string, accessToken string)
 	return os.WriteFile(GetLibrespotConfigFile(), configYaml, 0644)
 }
 
-func makeLibrespotConfig(cfg utils.AppConfig, userId string, accessToken string) LibrespotConfig {
+func makeLibrespotConfig(cfg utils.AppConfig) LibrespotConfig {
 	var librespotConfig = LibrespotConfig{}
 
 	librespotConfig.LogLevel = daemonLogLevel(cfg.Librespot.Daemon.LogLevel)
-	librespotConfig.ZeroconfEnabled = cfg.Librespot.Daemon.ZeroconfEnabled
+
+	// Zeroconf is required for authentication.
+	librespotConfig.ZeroconfEnabled = true
+	librespotConfig.Credentials.Type = "zeroconf"
+	librespotConfig.Credentials.Zeroconf.PersistCredentials = true
 	librespotConfig.MprisEnabled = mprisEnabledForOS(runtime.GOOS)
 	librespotConfig.AudioBackend = getAudioBackend()
 	librespotConfig.DeviceName = "lazyspotify"
-	librespotConfig.Credentials.Type = "spotify_token"
-	librespotConfig.Credentials.SpotifyToken.Username = userId
-	librespotConfig.Credentials.SpotifyToken.AccessToken = accessToken
+
+	// Spotify Login5 no longer accepts the OAuth token used by LazySpotify.
+	// Authentication is handled by go-librespot's Zeroconf flow instead.
 	librespotConfig.Server.Enabled = true
 	librespotConfig.Server.Address = cfg.Librespot.Host
 	librespotConfig.Server.Port = cfg.Librespot.Port

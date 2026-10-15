@@ -192,7 +192,6 @@ The generated daemon config is written automatically under the `librespot/` subd
 | `librespot.volume-step` | No | `20` | Volume step percentage (0-100) used for volume controls. |
 | `librespot.daemon.cmd` | Sometimes | none | Required for source/manual installs unless a packaged daemon path was compiled into the binary. |
 | `librespot.daemon.log_level` | No | `ERROR` | Log level written into the generated librespot daemon config. |
-| `librespot.daemon.zeroconf_enabled` | No | `false` | Enables zeroconf in the daemon config. |
 
 Environment variables can override config values by replacing `.` and `-` with `_`. Examples: `LOG_LEVEL`, `AUTH_CLIENT_ID`, `LIBRESPOT_DAEMON_LOG_LEVEL`.
 

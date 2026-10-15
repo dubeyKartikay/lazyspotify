@@ -47,7 +47,7 @@ func TestMakeLibrespotConfigUsesConfiguredDaemonLogLevel(t *testing.T) {
 	cfg.Librespot.Port = 4040
 	cfg.Librespot.Daemon.LogLevel = "WARN"
 
-	got := makeLibrespotConfig(cfg, "user-id", "token")
+	got := makeLibrespotConfig(cfg)
 
 	if got.LogLevel != "warn" {
 		t.Fatalf("makeLibrespotConfig(...).LogLevel = %q, want %q", got.LogLevel, "warn")
@@ -59,7 +59,7 @@ func TestMakeLibrespotConfigDefaultsDaemonLogLevelToError(t *testing.T) {
 	cfg.Librespot.Host = "127.0.0.1"
 	cfg.Librespot.Port = 4040
 
-	got := makeLibrespotConfig(cfg, "user-id", "token")
+	got := makeLibrespotConfig(cfg)
 
 	if got.LogLevel != "error" {
 		t.Fatalf("makeLibrespotConfig(...).LogLevel = %q, want %q", got.LogLevel, "error")
@@ -71,7 +71,7 @@ func TestMakeLibrespotConfigEnablesMprisOnLinux(t *testing.T) {
 	cfg.Librespot.Host = "127.0.0.1"
 	cfg.Librespot.Port = 4040
 
-	got := makeLibrespotConfig(cfg, "user-id", "token")
+	got := makeLibrespotConfig(cfg)
 
 	if runtime.GOOS == "linux" && !got.MprisEnabled {
 		t.Fatal("makeLibrespotConfig(...).MprisEnabled = false, want true on linux")
@@ -79,5 +79,29 @@ func TestMakeLibrespotConfigEnablesMprisOnLinux(t *testing.T) {
 
 	if runtime.GOOS != "linux" && got.MprisEnabled {
 		t.Fatalf("makeLibrespotConfig(...).MprisEnabled = true, want false on %s", runtime.GOOS)
+	}
+}
+
+func TestMakeLibrespotConfigUsesZeroconfCredentials(t *testing.T) {
+	cfg := utils.AppConfig{}
+	cfg.Librespot.Host = "127.0.0.1"
+	cfg.Librespot.Port = 4040
+
+	got := makeLibrespotConfig(cfg)
+
+	if !got.ZeroconfEnabled {
+		t.Fatal("makeLibrespotConfig(...).ZeroconfEnabled = false, want true")
+	}
+
+	if got.Credentials.Type != "zeroconf" {
+		t.Fatalf(
+			"makeLibrespotConfig(...).Credentials.Type = %q, want %q",
+			got.Credentials.Type,
+			"zeroconf",
+		)
+	}
+
+	if !got.Credentials.Zeroconf.PersistCredentials {
+		t.Fatal("makeLibrespotConfig(...).Credentials.Zeroconf.PersistCredentials = false, want true")
 	}
 }
