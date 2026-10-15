@@ -47,7 +47,7 @@ pkgdesc="Terminal Spotify client bundled with a patched go-librespot daemon"
 arch=('x86_64')
 url="https://github.com/$(github_repository)"
 license=('MIT' 'GPL3')
-depends=('alsa-lib' 'flac' 'glibc' 'libogg' 'libvorbis')
+depends=('alsa-lib' 'flac' 'glibc' 'libogg' 'libvorbis' 'mpg123')
 optdepends=(
   'gnome-keyring: Secret Service keyring provider'
   'keepassxc: Secret Service keyring provider'
@@ -82,6 +82,7 @@ pkgbase = lazyspotify-bin
 	depends = glibc
 	depends = libogg
 	depends = libvorbis
+	depends = mpg123
 	optdepends = gnome-keyring: Secret Service keyring provider
 	optdepends = keepassxc: Secret Service keyring provider
 	optdepends = kwallet: Secret Service keyring provider

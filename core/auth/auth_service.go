@@ -82,6 +82,27 @@ func (a *AuthService) MakeOauthCallbackHandler() (func(w http.ResponseWriter, r 
 	return callback, errCh
 }
 
+// ExchangePastedCallback completes the login from a callback value the user
+// pasted back, for browsers that cannot reach the callback server.
+func (a *AuthService) ExchangePastedCallback(ctx context.Context, pasted string) (*oauth2.Token, error) {
+	code, err := a.authConfig.ParsePastedCallback(pasted)
+	if err != nil {
+		return nil, err
+	}
+	tok, err := a.sptAuth.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", a.authConfig.codeVerifier))
+	if err != nil {
+		return nil, fmt.Errorf("failed exchanging pasted code: %w", err)
+	}
+	a.sendToken(tok)
+	return tok, nil
+}
+
+// sendToken lets either the browser callback or pasted callback complete this
+// login once. A late result cannot leave another token queued after completion.
+func (a *AuthService) sendToken(tok *oauth2.Token) {
+	a.tokenDelivered.Do(func() { a.tknChannel <- tok })
+}
+
 func (a *AuthService) writeSuccess(w http.ResponseWriter) {
 	if a.postAuthRedirect != nil {
 		if url, code, ok := a.postAuthRedirect(); ok {
@@ -112,25 +133,4 @@ func writePairingRedirect(w http.ResponseWriter, url string, code string) {
 func (a *AuthService) GetSpotifyClient(tkn *oauth2.Token) *spotify.Client {
 	httpClient := a.sptAuth.Client(context.Background(), tkn)
 	return spotify.New(httpClient)
-}
-
-// ExchangePastedCallback completes the login from a callback value the user
-// pasted back, for browsers that cannot reach the callback server.
-func (a *AuthService) ExchangePastedCallback(ctx context.Context, pasted string) (*oauth2.Token, error) {
-	code, err := a.authConfig.ParsePastedCallback(pasted)
-	if err != nil {
-		return nil, err
-	}
-	tok, err := a.sptAuth.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", a.authConfig.codeVerifier))
-	if err != nil {
-		return nil, fmt.Errorf("failed exchanging pasted code: %w", err)
-	}
-	a.sendToken(tok)
-	return tok, nil
-}
-
-// sendToken lets either the browser callback or pasted callback complete this
-// login once. A late result cannot leave another token queued after completion.
-func (a *AuthService) sendToken(tok *oauth2.Token) {
-	a.tokenDelivered.Do(func() { a.tknChannel <- tok })
 }

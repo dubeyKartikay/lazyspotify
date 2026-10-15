@@ -16,6 +16,7 @@ BuildRequires:  gcc
 BuildRequires:  go
 BuildRequires:  libogg-devel
 BuildRequires:  libvorbis-devel
+BuildRequires:  mpg123-devel
 BuildRequires:  pkgconfig
 
 %description

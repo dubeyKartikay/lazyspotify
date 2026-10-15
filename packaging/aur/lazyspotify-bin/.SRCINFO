@@ -11,6 +11,7 @@ pkgbase = lazyspotify-bin
 	depends = glibc
 	depends = libogg
 	depends = libvorbis
+	depends = mpg123
 	optdepends = gnome-keyring: Secret Service keyring provider
 	optdepends = keepassxc: Secret Service keyring provider
 	optdepends = kwallet: Secret Service keyring provider
