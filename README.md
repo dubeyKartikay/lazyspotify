@@ -1,5 +1,3 @@
-> ✍️ I write about building tools like this at [dubeykartikay.com](https://dubeykartikay.com).
-
 <div align="center">
   <img width="220" src="./docs/assets/logo.png" alt="lazyspotify logo" />
   <h1>lazyspotify</h1>
