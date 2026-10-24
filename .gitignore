@@ -5,3 +5,7 @@ target/
 .DS_Store
 dist/
 lazyspotify
+
+# gooze mutation testing
+.gooze-reports
+.gooze.log*
