@@ -12,7 +12,8 @@ import (
 type Authenticator struct {
 	AuthServer  *AuthServer
 	authService *AuthService
-	keyring     *Keyring
+	tokenStore  TokenStore
+	storeErr    error
 	tokenKey    string
 	oauthErrCh  chan error
 }
@@ -22,9 +23,11 @@ func New() *Authenticator {
 	authService := NewAuthService(authServer.GetOauthRedirectURI())
 	oauthCallbackFunc, err := authService.MakeOauthCallbackHandler()
 	authServer.InitAuthServer(oauthCallbackFunc)
+	tokenStore, storeErr := NewTokenStore()
 	return &Authenticator{
 		AuthServer:  authServer,
-		keyring:     NewSpotifyKeyring(),
+		tokenStore:  tokenStore,
+		storeErr:    storeErr,
 		authService: authService,
 		tokenKey:    utils.GetConfig().Auth.Keyring.Key,
 		oauthErrCh:  err,
@@ -32,7 +35,10 @@ func New() *Authenticator {
 }
 
 func (a *Authenticator) GetAuthToken(ctx context.Context) (*oauth2.Token, error) {
-	tkn, err := a.keyring.GetToken(a.tokenKey)
+	if a.storeErr != nil {
+		return nil, a.storeErr
+	}
+	tkn, err := GetOAuthToken(a.tokenStore, a.tokenKey)
 	if err != nil {
 		logger.Log.Error().Err(err).Msg("error getting token")
 		return nil, err
@@ -89,5 +95,8 @@ func (a *Authenticator) CompleteLoginWithPastedCallback(ctx context.Context, pas
 }
 
 func (a *Authenticator) saveToken(token *oauth2.Token) error {
-	return a.keyring.SetToken(a.tokenKey, token)
+	if a.storeErr != nil {
+		return a.storeErr
+	}
+	return SetOAuthToken(a.tokenStore, a.tokenKey, token)
 }

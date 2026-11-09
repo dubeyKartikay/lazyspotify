@@ -197,7 +197,7 @@ func idFromURI(uri string) (string, error) {
 
 func IsAuthError(err error) bool {
 	var spotifyErr spotify.Error
-	if errors.Is(err, keyring.ErrNotFound) {
+	if errors.Is(err, auth.ErrTokenNotFound) || errors.Is(err, keyring.ErrNotFound) {
 		return true
 	}
 	if errors.As(err, &spotifyErr) && spotifyErr.Status == http.StatusUnauthorized {

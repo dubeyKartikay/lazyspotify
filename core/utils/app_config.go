@@ -17,6 +17,33 @@ const (
 	defaultAppConfigFileContent = "auth:\n  client_id: your_spotify_app_client_id\n"
 )
 
+// Token store backends select where lazyspotify keeps the Spotify OAuth token.
+const (
+	TokenStoreBackendKeyring = "keyring"
+	TokenStoreBackendFile    = "file"
+	TokenStoreBackendCommand = "command"
+
+	defaultTokenStoreCommandTimeout = 10
+)
+
+// SupportedTokenStoreBackends lists the accepted auth.token-store.backend
+// values, in the order they are documented.
+var SupportedTokenStoreBackends = []string{
+	TokenStoreBackendKeyring,
+	TokenStoreBackendFile,
+	TokenStoreBackendCommand,
+}
+
+// NormalizeTokenStoreBackend lowercases the configured backend and falls back
+// to the system keyring when it is unset.
+func NormalizeTokenStoreBackend(backend string) string {
+	backend = strings.ToLower(strings.TrimSpace(backend))
+	if backend == "" {
+		return TokenStoreBackendKeyring
+	}
+	return backend
+}
+
 var (
 	config        AppConfig
 	configLoadErr error
@@ -45,6 +72,17 @@ type AppConfig struct {
 			Service string `mapstructure:"service"`
 			Key     string `mapstructure:"key"`
 		} `mapstructure:"keyring"`
+		TokenStore struct {
+			Backend string `mapstructure:"backend"`
+			File    struct {
+				Path string `mapstructure:"path"`
+			} `mapstructure:"file"`
+			Command struct {
+				Get     []string `mapstructure:"get"`
+				Set     []string `mapstructure:"set"`
+				Timeout int      `mapstructure:"timeout"`
+			} `mapstructure:"command"`
+		} `mapstructure:"token-store"`
 	} `mapstructure:"auth"`
 	Librespot struct {
 		Host       string `mapstructure:"host"`
@@ -75,6 +113,8 @@ func getDefaultAppConfig() AppConfig {
 	cfg.Auth.Timeout = 30
 	cfg.Auth.Keyring.Service = "spotify"
 	cfg.Auth.Keyring.Key = "token-v2"
+	cfg.Auth.TokenStore.Backend = TokenStoreBackendKeyring
+	cfg.Auth.TokenStore.Command.Timeout = defaultTokenStoreCommandTimeout
 	cfg.Librespot.Host = "127.0.0.1"
 	cfg.Librespot.Port = 4040
 	cfg.Librespot.Timeout = 180
@@ -123,7 +163,29 @@ func validateStartupConfig(cfg AppConfig) error {
 	if clientID := cfg.SpotifyClientID(); clientID == "" || clientID == spotifyClientIDPlaceholder {
 		return fmt.Errorf("missing required config value `auth.client_id`; see %s", SpotifyClientIDHelpURL)
 	}
-	return nil
+	return validateTokenStoreConfig(cfg)
+}
+
+func validateTokenStoreConfig(cfg AppConfig) error {
+	store := cfg.Auth.TokenStore
+	switch NormalizeTokenStoreBackend(store.Backend) {
+	case TokenStoreBackendKeyring, TokenStoreBackendFile:
+		return nil
+	case TokenStoreBackendCommand:
+		if len(store.Command.Get) == 0 {
+			return fmt.Errorf("missing required config value `auth.token-store.command.get` for the command token store")
+		}
+		if len(store.Command.Set) == 0 {
+			return fmt.Errorf("missing required config value `auth.token-store.command.set` for the command token store")
+		}
+		return nil
+	default:
+		return fmt.Errorf(
+			"unsupported config value `auth.token-store.backend: %s`; supported backends: %s",
+			store.Backend,
+			strings.Join(SupportedTokenStoreBackends, ", "),
+		)
+	}
 }
 
 func ensureAppConfigFile() (string, error) {
@@ -172,6 +234,11 @@ func applyConfigDefaults(v *viper.Viper) {
 	v.SetDefault("auth.timeout", defaults.Auth.Timeout)
 	v.SetDefault("auth.keyring.service", defaults.Auth.Keyring.Service)
 	v.SetDefault("auth.keyring.key", defaults.Auth.Keyring.Key)
+	v.SetDefault("auth.token-store.backend", defaults.Auth.TokenStore.Backend)
+	v.SetDefault("auth.token-store.file.path", defaults.Auth.TokenStore.File.Path)
+	v.SetDefault("auth.token-store.command.get", defaults.Auth.TokenStore.Command.Get)
+	v.SetDefault("auth.token-store.command.set", defaults.Auth.TokenStore.Command.Set)
+	v.SetDefault("auth.token-store.command.timeout", defaults.Auth.TokenStore.Command.Timeout)
 	v.SetDefault("librespot.host", defaults.Librespot.Host)
 	v.SetDefault("librespot.port", defaults.Librespot.Port)
 	v.SetDefault("librespot.timeout", defaults.Librespot.Timeout)

@@ -15,7 +15,7 @@
 ## Requirements
 
 - A Spotify Premium account.
-- A working system keyring.
+- A working system keyring, or one of the headless token stores described in [Headless and non-keyring setups](#headless-and-non-keyring-setups).
 - The patched `lazyspotify-librespot` daemon with device authorization support (only if you are installing from source or running an unpackaged build).
 - For macOS source or ZIP installs, install the runtime audio libraries with `brew install flac libogg libvorbis mpg123`. Homebrew package installs handle these dependencies automatically.
 - On Linux, one of `wl-clipboard`, `xclip`, or `xsel` if you want clipboard support on the auth screen.
@@ -126,7 +126,7 @@ Spotify deprecated the token-based login the player daemon previously used, so l
 
 1. Start `lazyspotify`. On the first run you are asked to log in with your Spotify account through the browser (this uses your own client ID from the section above and powers browsing).
 2. After you approve, the same browser page continues straight to Spotify's device pairing screen with the code already filled in. Approve the pairing to connect the player daemon.
-3. The daemon stores its own credentials. On later runs lazyspotify starts silently: the login token comes from your keyring and the player reuses the daemon's stored credentials. You only see the pairing screen again if Spotify invalidated the stored credentials.
+3. The daemon stores its own credentials. On later runs lazyspotify starts silently: the login token comes from your configured token store and the player reuses the daemon's stored credentials. You only see the pairing screen again if Spotify invalidated the stored credentials.
 
 The token from your own client ID is only used for Web API requests (playlists, search, library). The player daemon authenticates itself through Spotify's device authorization flow, so it no longer depends on your client ID or token.
 
@@ -186,7 +186,12 @@ The generated daemon config is written automatically under the `librespot/` subd
 | `auth.redirect-endpoint` | No | `/callback` | Callback path for Spotify OAuth. |
 | `auth.timeout` | No | `30` | Auth server shutdown timeout in seconds. |
 | `auth.keyring.service` | No | `spotify` | Keyring service name for stored tokens. |
-| `auth.keyring.key` | No | `token-v2` | Keyring key for stored tokens. |
+| `auth.keyring.key` | No | `token-v2` | Key under which the token is stored; used by every token store backend. |
+| `auth.token-store.backend` | No | `keyring` | Where the login token is stored: `keyring`, `file`, or `command`. See [Headless and non-keyring setups](#headless-and-non-keyring-setups). |
+| `auth.token-store.file.path` | No | `token.json` in the config directory | Token file used by the `file` backend. `~` is expanded and relative paths resolve against the config directory. |
+| `auth.token-store.command.get` | For `command` | none | Argv that prints the stored token on stdout. Exit non-zero when no token is stored yet. |
+| `auth.token-store.command.set` | For `command` | none | Argv that reads a token from stdin and stores it. |
+| `auth.token-store.command.timeout` | No | `10` | Timeout in seconds for each token store command. |
 
 ### Librespot Settings
 
@@ -203,7 +208,40 @@ The generated daemon config is written automatically under the `librespot/` subd
 | `librespot.daemon.log_level` | No | `ERROR` | Log level written into the generated librespot daemon config. |
 | `librespot.daemon.zeroconf_enabled` | No | `false` | Enables zeroconf in the daemon config. |
 
-Environment variables can override config values by replacing `.` and `-` with `_`. Examples: `LOG_LEVEL`, `AUTH_CLIENT_ID`, `LIBRESPOT_DAEMON_LOG_LEVEL`.
+Environment variables can override config values by replacing `.` and `-` with `_`. Examples: `LOG_LEVEL`, `AUTH_CLIENT_ID`, `AUTH_TOKEN_STORE_BACKEND`, `LIBRESPOT_DAEMON_LOG_LEVEL`.
+
+### Headless and non-keyring setups
+
+The default `keyring` backend needs a system keyring, which on Linux means Secret Service and D-Bus. Headless setups such as WSL instances, containers, and servers often cannot provide one. Set `auth.token-store.backend` to keep the login token somewhere else:
+
+- `keyring` (default): the system keyring.
+- `file`: a plaintext JSON file with `0600` permissions. Anyone who can read the file can read your Spotify token.
+- `command`: an external secret manager such as `pass` or `oo7`. `command.get` prints the token on stdout and exits non-zero when none is stored yet; `command.set` reads the token from stdin and stores it.
+
+Plaintext file:
+
+```yaml
+auth:
+  client_id: your_spotify_app_client_id
+  token-store:
+    backend: file
+    file:
+      path: ~/.config/lazyspotify/token.json
+```
+
+Password Store (`pass`):
+
+```yaml
+auth:
+  client_id: your_spotify_app_client_id
+  token-store:
+    backend: command
+    command:
+      get: [pass, show, lazyspotify/token]
+      set: [pass, insert, -m, -f, lazyspotify/token]
+```
+
+The `get` command is expected to fail when no token exists yet, so the first run still shows the login screen. The configured token key (`auth.keyring.key`) is exported to both commands as `LAZYSPOTIFY_TOKEN_KEY`. Changing backends does not migrate existing tokens, so you log in once more after switching.
 
 ## Run
 
