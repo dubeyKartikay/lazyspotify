@@ -215,8 +215,8 @@ Environment variables can override config values by replacing `.` and `-` with `
 The default `keyring` backend needs a system keyring, which on Linux means Secret Service and D-Bus. Headless setups such as WSL instances, containers, and servers often cannot provide one. Set `auth.token-store.backend` to keep the login token somewhere else:
 
 - `keyring` (default): the system keyring.
-- `file`: a plaintext JSON file with `0600` permissions. Anyone who can read the file can read your Spotify token.
-- `command`: an external secret manager such as `pass` or `oo7`. `command.get` prints the token on stdout and exits non-zero when none is stored yet; `command.set` reads the token from stdin and stores it.
+- `file`: a plaintext JSON file with `0600` permissions. Anyone who can read the file can read your Spotify token. A file that cannot be parsed is moved aside to `<path>.corrupt-<timestamp>` so the next login can rebuild it.
+- `command`: an external secret manager such as `pass` or `oo7`. `command.get` prints the token on stdout and exits non-zero when none is stored yet; `command.set` reads the token from stdin and stores it. A stored value that is not a valid token is treated as missing, so the next login replaces it.
 
 Plaintext file:
 

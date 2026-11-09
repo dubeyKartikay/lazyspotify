@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/core/utils"
@@ -120,13 +121,44 @@ func (f *FileTokenStore) read() (map[string]string, error) {
 
 	values := map[string]string{}
 	if err := json.Unmarshal(data, &values); err != nil {
-		return nil, fmt.Errorf(
-			"parse token file %s: %w; delete the file and log in again to rebuild it",
-			f.path,
-			err,
-		)
+		quarantined, quarantineErr := quarantineTokenFile(f.path)
+		if quarantineErr != nil {
+			return nil, fmt.Errorf(
+				"parse token file %s: %w; delete the file and log in again to rebuild it",
+				f.path,
+				err,
+			)
+		}
+		logger.Log.Warn().
+			Err(err).
+			Str("path", f.path).
+			Str("quarantined_path", quarantined).
+			Msg("token file was unreadable; moved it aside so the next login can rebuild it")
+		return nil, ErrTokenNotFound
 	}
 	return values, nil
+}
+
+// quarantineTokenFile moves an unreadable token file out of the way so the
+// next login can write a fresh one without destroying the evidence.
+func quarantineTokenFile(path string) (string, error) {
+	base := fmt.Sprintf("%s.corrupt-%d", path, time.Now().UTC().Unix())
+	for attempt := 0; attempt < 10; attempt++ {
+		target := base
+		if attempt > 0 {
+			target = fmt.Sprintf("%s-%d", base, attempt)
+		}
+		if _, err := os.Stat(target); err == nil {
+			continue
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return "", err
+		}
+		if err := os.Rename(path, target); err != nil {
+			return "", err
+		}
+		return target, nil
+	}
+	return "", fmt.Errorf("could not find a free quarantine path for %s", path)
 }
 
 func warnLoosePermissions(path string) {

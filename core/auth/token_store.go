@@ -58,7 +58,11 @@ func GetOAuthToken(store TokenStore, key string) (*oauth2.Token, error) {
 	}
 	token := oauth2.Token{}
 	if err := json.Unmarshal([]byte(serialized), &token); err != nil {
-		return nil, fmt.Errorf("decode stored token: %w", err)
+		logger.Log.Warn().
+			Err(err).
+			Str("key", key).
+			Msg("stored token is unreadable; treating it as missing so the next login can replace it")
+		return nil, ErrTokenNotFound
 	}
 	return &token, nil
 }

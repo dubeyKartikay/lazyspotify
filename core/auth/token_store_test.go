@@ -104,7 +104,7 @@ func TestOAuthTokenRoundTripsThroughTokenStore(t *testing.T) {
 	}
 }
 
-func TestGetOAuthTokenRejectsCorruptToken(t *testing.T) {
+func TestGetOAuthTokenTreatsUndecodableTokenAsMissing(t *testing.T) {
 	store, err := NewFileTokenStore(filepath.Join(t.TempDir(), "token.json"))
 	if err != nil {
 		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
@@ -113,7 +113,19 @@ func TestGetOAuthTokenRejectsCorruptToken(t *testing.T) {
 		t.Fatalf("SetString() error = %v, want nil", err)
 	}
 
-	if _, err := GetOAuthToken(store, "token-v2"); err == nil {
-		t.Fatal("GetOAuthToken() = nil error, want decode error")
+	if _, err := GetOAuthToken(store, "token-v2"); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("GetOAuthToken() = %v, want ErrTokenNotFound so login can restart", err)
+	}
+
+	token := &oauth2.Token{AccessToken: "fresh"}
+	if err := SetOAuthToken(store, "token-v2", token); err != nil {
+		t.Fatalf("SetOAuthToken() error = %v, want nil", err)
+	}
+	got, err := GetOAuthToken(store, "token-v2")
+	if err != nil {
+		t.Fatalf("GetOAuthToken() after re-login error = %v, want nil", err)
+	}
+	if got.AccessToken != "fresh" {
+		t.Fatalf("GetOAuthToken().AccessToken = %q, want %q", got.AccessToken, "fresh")
 	}
 }

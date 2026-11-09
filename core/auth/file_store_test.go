@@ -85,7 +85,7 @@ func TestFileTokenStoreMissingKey(t *testing.T) {
 	}
 }
 
-func TestFileTokenStoreCorruptFileIsAnError(t *testing.T) {
+func TestFileTokenStoreQuarantinesCorruptFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "token.json")
 	if err := os.WriteFile(path, []byte("not json"), 0o600); err != nil {
 		t.Fatalf("os.WriteFile(%q) error = %v, want nil", path, err)
@@ -95,12 +95,67 @@ func TestFileTokenStoreCorruptFileIsAnError(t *testing.T) {
 		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
 	}
 
-	_, err = store.GetString("token-v2")
-	if err == nil {
-		t.Fatal("GetString() on corrupt file = nil, want error")
+	if _, err := store.GetString("token-v2"); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("GetString() on corrupt file = %v, want ErrTokenNotFound so login can restart", err)
 	}
-	if errors.Is(err, ErrTokenNotFound) {
-		t.Fatalf("GetString() on corrupt file = %v, want parse error", err)
+
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("os.Stat(%q) = %v, want the corrupt file to be moved aside", path, err)
+	}
+	quarantined, err := filepath.Glob(path + ".corrupt-*")
+	if err != nil {
+		t.Fatalf("filepath.Glob() error = %v, want nil", err)
+	}
+	if len(quarantined) != 1 {
+		t.Fatalf("quarantined files = %v, want exactly one", quarantined)
+	}
+	contents, err := os.ReadFile(quarantined[0])
+	if err != nil {
+		t.Fatalf("os.ReadFile(%q) error = %v, want nil", quarantined[0], err)
+	}
+	if string(contents) != "not json" {
+		t.Fatalf("quarantined contents = %q, want the original bytes", string(contents))
+	}
+
+	// A fresh login must be able to write the token again.
+	if err := store.SetString("token-v2", "fresh"); err != nil {
+		t.Fatalf("SetString() after quarantine error = %v, want nil", err)
+	}
+	got, err := store.GetString("token-v2")
+	if err != nil {
+		t.Fatalf("GetString() after quarantine error = %v, want nil", err)
+	}
+	if got != "fresh" {
+		t.Fatalf("GetString() = %q, want %q", got, "fresh")
+	}
+}
+
+func TestFileTokenStoreQuarantineDoesNotClobberExistingBackup(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token.json")
+	store, err := NewFileTokenStore(path)
+	if err != nil {
+		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
+	}
+	if err := os.WriteFile(path, []byte("first corrupt"), 0o600); err != nil {
+		t.Fatalf("os.WriteFile(%q) error = %v, want nil", path, err)
+	}
+	if _, err := store.GetString("token-v2"); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("first GetString() = %v, want ErrTokenNotFound", err)
+	}
+
+	if err := os.WriteFile(path, []byte("second corrupt"), 0o600); err != nil {
+		t.Fatalf("os.WriteFile(%q) error = %v, want nil", path, err)
+	}
+	if _, err := store.GetString("token-v2"); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("second GetString() = %v, want ErrTokenNotFound", err)
+	}
+
+	quarantined, err := filepath.Glob(path + ".corrupt-*")
+	if err != nil {
+		t.Fatalf("filepath.Glob() error = %v, want nil", err)
+	}
+	if len(quarantined) != 2 {
+		t.Fatalf("quarantined files = %v, want two distinct backups", quarantined)
 	}
 }
 
