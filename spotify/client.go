@@ -9,7 +9,6 @@ import (
 
 	"github.com/dubeyKartikay/lazyspotify/core/auth"
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
-	"github.com/zalando/go-keyring"
 	"github.com/zmb3/spotify/v2"
 	"golang.org/x/oauth2"
 )
@@ -197,7 +196,7 @@ func idFromURI(uri string) (string, error) {
 
 func IsAuthError(err error) bool {
 	var spotifyErr spotify.Error
-	if errors.Is(err, keyring.ErrNotFound) {
+	if errors.Is(err, auth.ErrTokenNotFound) {
 		return true
 	}
 	if errors.As(err, &spotifyErr) && spotifyErr.Status == http.StatusUnauthorized {
