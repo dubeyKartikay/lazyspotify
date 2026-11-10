@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,12 +13,18 @@ import (
 
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/core/utils"
+	"golang.org/x/oauth2"
 )
 
 const (
 	defaultTokenFileName = "token.json"
 	tokenFilePermission  = 0o600
-	tokenDirPermission   = 0o700
+	// tokenDirPermission applies only to directories this store creates; an
+	// existing config directory keeps whatever mode it already has.
+	tokenDirPermission = 0o700
+	// staleTokenTempAge is how old a leftover .token-*.tmp must be before it
+	// is swept. The margin keeps a concurrent writer's file safe.
+	staleTokenTempAge = time.Hour
 )
 
 // FileTokenStore keeps tokens in a plaintext JSON file. It exists for headless
@@ -40,29 +47,35 @@ func NewFileTokenStore(path string) (*FileTokenStore, error) {
 		resolved = defaultTokenFileName
 	}
 	if !filepath.IsAbs(resolved) {
-		resolved = filepath.Join(utils.SafeGetConfigDir(), resolved)
+		configDir := utils.ConfigDir()
+		if configDir == "" {
+			return nil, errors.New("failed to resolve user config directory")
+		}
+		resolved = filepath.Join(configDir, resolved)
 	}
 	return &FileTokenStore{path: resolved}, nil
 }
 
-// Path reports where the token file lives.
-func (f *FileTokenStore) Path() string {
-	return f.path
-}
-
-func (f *FileTokenStore) GetString(key string) (string, error) {
+func (f *FileTokenStore) Get(ctx context.Context, key string) (*oauth2.Token, error) {
+	_ = ctx
 	values, err := f.read()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	value, ok := values[key]
 	if !ok || value == "" {
-		return "", ErrTokenNotFound
+		return nil, ErrTokenNotFound
 	}
-	return value, nil
+	return decodeToken(key, value)
 }
 
-func (f *FileTokenStore) SetString(key, value string) error {
+func (f *FileTokenStore) Set(ctx context.Context, key string, token *oauth2.Token) error {
+	_ = ctx
+	encoded, err := encodeToken(token)
+	if err != nil {
+		return err
+	}
+
 	values, err := f.read()
 	if err != nil && !errors.Is(err, ErrTokenNotFound) {
 		return err
@@ -70,18 +83,19 @@ func (f *FileTokenStore) SetString(key, value string) error {
 	if values == nil {
 		values = map[string]string{}
 	}
-	values[key] = value
+	values[key] = encoded
 
-	encoded, err := json.MarshalIndent(values, "", "  ")
+	data, err := json.MarshalIndent(values, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode token file %s: %w", f.path, err)
 	}
-	encoded = append(encoded, '\n')
+	data = append(data, '\n')
 
 	dir := filepath.Dir(f.path)
 	if err := os.MkdirAll(dir, tokenDirPermission); err != nil {
 		return fmt.Errorf("create token directory %s: %w", dir, err)
 	}
+	sweepStaleTokenTemps(dir)
 
 	tmp, err := os.CreateTemp(dir, ".token-*.tmp")
 	if err != nil {
@@ -94,9 +108,13 @@ func (f *FileTokenStore) SetString(key, value string) error {
 		_ = tmp.Close()
 		return fmt.Errorf("set permissions on %s: %w", tmpName, err)
 	}
-	if _, err := tmp.Write(encoded); err != nil {
+	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
 		return fmt.Errorf("write token file %s: %w", tmpName, err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("sync token file %s: %w", tmpName, err)
 	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close token file %s: %w", tmpName, err)
@@ -104,6 +122,7 @@ func (f *FileTokenStore) SetString(key, value string) error {
 	if err := os.Rename(tmpName, f.path); err != nil {
 		return fmt.Errorf("replace token file %s: %w", f.path, err)
 	}
+	syncDir(dir)
 	return nil
 }
 
@@ -161,12 +180,39 @@ func quarantineTokenFile(path string) (string, error) {
 	return "", fmt.Errorf("could not find a free quarantine path for %s", path)
 }
 
-func warnLoosePermissions(path string) {
-	info, err := os.Stat(path)
+// sweepStaleTokenTemps removes temporary files left behind by a crash between
+// create and rename. They hold token material, so they must not linger.
+func sweepStaleTokenTemps(dir string) {
+	matches, err := filepath.Glob(filepath.Join(dir, ".token-*.tmp"))
 	if err != nil {
 		return
 	}
-	if info.Mode().Perm()&0o077 == 0 {
+	cutoff := time.Now().Add(-staleTokenTempAge)
+	for _, match := range matches {
+		info, err := os.Stat(match)
+		if err != nil || info.ModTime().After(cutoff) {
+			continue
+		}
+		if err := os.Remove(match); err == nil {
+			logger.Log.Debug().Str("path", match).Msg("removed stale token temporary file")
+		}
+	}
+}
+
+// syncDir flushes the directory entry after a rename so the new file survives
+// a crash. Directory fsync is best effort: some filesystems reject it.
+func syncDir(dir string) {
+	handle, err := os.Open(dir)
+	if err != nil {
+		return
+	}
+	_ = handle.Sync()
+	_ = handle.Close()
+}
+
+func warnLoosePermissions(path string) {
+	info, err := os.Stat(path)
+	if err != nil || !hasLoosePermissions(info.Mode()) {
 		return
 	}
 	logger.Log.Warn().
@@ -175,13 +221,27 @@ func warnLoosePermissions(path string) {
 		Msg("token file is readable by other users; run chmod 600 on it")
 }
 
+// hasLoosePermissions reports whether group or other users can access the file.
+func hasLoosePermissions(mode fs.FileMode) bool {
+	return mode.Perm()&0o077 != 0
+}
+
 func expandHome(path string) (string, error) {
-	if path != "~" && !strings.HasPrefix(path, "~/") {
+	if path == "" || !strings.HasPrefix(path, "~") {
+		return path, nil
+	}
+	if path == "~" || path == "~/" {
+		return "", fmt.Errorf(
+			"invalid config value `auth.token-store.file.path: %s`; set a file path such as ~/token.json",
+			path,
+		)
+	}
+	if !strings.HasPrefix(path, "~/") {
 		return path, nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve home directory for token file path %q: %w", path, err)
 	}
-	return filepath.Join(home, path[1:]), nil
+	return filepath.Join(home, path[2:]), nil
 }

@@ -186,11 +186,13 @@ The generated daemon config is written automatically under the `librespot/` subd
 | `auth.redirect-endpoint` | No | `/callback` | Callback path for Spotify OAuth. |
 | `auth.timeout` | No | `30` | Auth server shutdown timeout in seconds. |
 | `auth.keyring.service` | No | `spotify` | Keyring service name for stored tokens. |
-| `auth.keyring.key` | No | `token-v2` | Key under which the token is stored; used by every token store backend. |
+| `auth.token-store.key` | No | `token-v2` | Key under which the token is stored, for every backend. |
+| `auth.keyring.key` | No | none | Deprecated alias for `auth.token-store.key`. |
 | `auth.token-store.backend` | No | `keyring` | Where the login token is stored: `keyring`, `file`, or `command`. See [Headless and non-keyring setups](#headless-and-non-keyring-setups). |
-| `auth.token-store.file.path` | No | `token.json` in the config directory | Token file used by the `file` backend. `~` is expanded and relative paths resolve against the config directory. |
-| `auth.token-store.command.get` | For `command` | none | Argv that prints the stored token on stdout. Exit non-zero when no token is stored yet. |
+| `auth.token-store.file.path` | No | `token.json` in the config directory | Token file used by the `file` backend. `~` is expanded, relative paths resolve against the config directory, and the path must name a file. |
+| `auth.token-store.command.get` | For `command` | none | Argv that prints the stored token on stdout. It must exit with one of `not-found-exit-codes` **only** when no token exists yet. |
 | `auth.token-store.command.set` | For `command` | none | Argv that reads a token from stdin and stores it. |
+| `auth.token-store.command.not-found-exit-codes` | No | any non-zero exit | Exit codes from `get` that mean "no token stored yet". Set this to protect real failures from being treated as a missing token. |
 | `auth.token-store.command.timeout` | No | `10` | Timeout in seconds for each token store command. |
 
 ### Librespot Settings
@@ -210,13 +212,24 @@ The generated daemon config is written automatically under the `librespot/` subd
 
 Environment variables can override config values by replacing `.` and `-` with `_`. Examples: `LOG_LEVEL`, `AUTH_CLIENT_ID`, `AUTH_TOKEN_STORE_BACKEND`, `LIBRESPOT_DAEMON_LOG_LEVEL`.
 
+Argv config values (`auth.token-store.command.get`, `auth.token-store.command.set`, `librespot.daemon.cmd`) are shell-split when set from the environment, so spaces separate arguments and quotes keep them together:
+
+```bash
+export AUTH_TOKEN_STORE_COMMAND_GET='pass show lazyspotify/token'
+export AUTH_TOKEN_STORE_COMMAND_SET='pass insert -m -f "lazyspotify/token"'
+```
+
 ### Headless and non-keyring setups
 
 The default `keyring` backend needs a system keyring, which on Linux means Secret Service and D-Bus. Headless setups such as WSL instances, containers, and servers often cannot provide one. Set `auth.token-store.backend` to keep the login token somewhere else:
 
 - `keyring` (default): the system keyring.
 - `file`: a plaintext JSON file with `0600` permissions. Anyone who can read the file can read your Spotify token. A file that cannot be parsed is moved aside to `<path>.corrupt-<timestamp>` so the next login can rebuild it.
-- `command`: an external secret manager such as `pass` or `oo7`. `command.get` prints the token on stdout and exits non-zero when none is stored yet; `command.set` reads the token from stdin and stores it. A stored value that is not a valid token is treated as missing, so the next login replaces it.
+- `command`: an external secret manager such as `pass` or `oo7`. `command.get` prints the token on stdout; `command.set` reads the token from stdin and stores it.
+
+Whatever the backend, a stored value that is not a usable token (`null`, `{}`, no access and no refresh token, or invalid JSON) is treated as missing, so the next login replaces it.
+
+`command.get` must exit non-zero **only** when no token exists yet. By default any non-zero exit means "log in again"; a locked `gpg-agent` or a broken `pass` install would then trigger a login that overwrites a still-valid entry. Set `not-found-exit-codes` to the codes that really mean "missing" so other failures stop the app with the command's stderr instead.
 
 Plaintext file:
 
@@ -239,9 +252,11 @@ auth:
     command:
       get: [pass, show, lazyspotify/token]
       set: [pass, insert, -m, -f, lazyspotify/token]
+      # `pass show` exits 1 when the entry is absent and 2 for GPG failures.
+      not-found-exit-codes: [1]
 ```
 
-The `get` command is expected to fail when no token exists yet, so the first run still shows the login screen. The configured token key (`auth.keyring.key`) is exported to both commands as `LAZYSPOTIFY_TOKEN_KEY`. Changing backends does not migrate existing tokens, so you log in once more after switching.
+The `get` command is expected to fail when no token exists yet, so the first run still shows the login screen. The configured token key (`auth.token-store.key`) is exported to both commands as `LAZYSPOTIFY_TOKEN_KEY`. Changing backends does not migrate existing tokens, so you log in once more after switching.
 
 ## Run
 

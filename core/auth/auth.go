@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	"github.com/zmb3/spotify/v2"
@@ -13,7 +15,6 @@ type Authenticator struct {
 	AuthServer  *AuthServer
 	authService *AuthService
 	tokenStore  TokenStore
-	storeErr    error
 	tokenKey    string
 	oauthErrCh  chan error
 }
@@ -21,25 +22,32 @@ type Authenticator struct {
 func New() *Authenticator {
 	authServer := NewAuthServer()
 	authService := NewAuthService(authServer.GetOauthRedirectURI())
-	oauthCallbackFunc, err := authService.MakeOauthCallbackHandler()
+	oauthCallbackFunc, oauthErr := authService.MakeOauthCallbackHandler()
 	authServer.InitAuthServer(oauthCallbackFunc)
 	tokenStore, storeErr := NewTokenStore()
+	if storeErr != nil {
+		// The UI builds the authenticator before it can report an error, so
+		// keep the failure in the store: the first token read at startup
+		// surfaces it before the browser login starts.
+		logger.Log.Error().Err(storeErr).Msg("failed to configure token store")
+		tokenStore = errorTokenStore{err: storeErr}
+	}
 	return &Authenticator{
 		AuthServer:  authServer,
 		tokenStore:  tokenStore,
-		storeErr:    storeErr,
 		authService: authService,
-		tokenKey:    utils.GetConfig().Auth.Keyring.Key,
-		oauthErrCh:  err,
+		tokenKey:    utils.GetConfig().AuthTokenKey(),
+		oauthErrCh:  oauthErr,
 	}
 }
 
 func (a *Authenticator) GetAuthToken(ctx context.Context) (*oauth2.Token, error) {
-	if a.storeErr != nil {
-		return nil, a.storeErr
-	}
-	tkn, err := GetOAuthToken(a.tokenStore, a.tokenKey)
+	tkn, err := a.tokenStore.Get(ctx, a.tokenKey)
 	if err != nil {
+		if errors.Is(err, ErrTokenNotFound) {
+			logger.Log.Debug().Msg("no stored token; login required")
+			return nil, err
+		}
 		logger.Log.Error().Err(err).Msg("error getting token")
 		return nil, err
 	}
@@ -70,7 +78,7 @@ func (a *Authenticator) ReAuthenticate(ctx context.Context, updates chan<- strin
 	if tkn == nil {
 		return nil, fmt.Errorf("authentication failed: received empty token")
 	}
-	if err := a.saveToken(tkn); err != nil {
+	if err := a.saveToken(ctx, tkn); err != nil {
 		return nil, fmt.Errorf("failed to save authentication token: %w", err)
 	}
 	updates <- "success"
@@ -94,9 +102,6 @@ func (a *Authenticator) CompleteLoginWithPastedCallback(ctx context.Context, pas
 	return err
 }
 
-func (a *Authenticator) saveToken(token *oauth2.Token) error {
-	if a.storeErr != nil {
-		return a.storeErr
-	}
-	return SetOAuthToken(a.tokenStore, a.tokenKey, token)
+func (a *Authenticator) saveToken(ctx context.Context, token *oauth2.Token) error {
+	return a.tokenStore.Set(ctx, a.tokenKey, token)
 }

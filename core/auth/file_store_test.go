@@ -1,33 +1,40 @@
 package auth
 
 import (
+	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"golang.org/x/oauth2"
 )
 
 func TestFileTokenStoreRoundTrip(t *testing.T) {
+	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "nested", "token.json")
 	store, err := NewFileTokenStore(path)
 	if err != nil {
 		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
 	}
 
-	if _, err := store.GetString("token-v2"); !errors.Is(err, ErrTokenNotFound) {
-		t.Fatalf("GetString() on empty store = %v, want ErrTokenNotFound", err)
+	if _, err := store.Get(ctx, "token-v2"); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("Get() on empty store = %v, want ErrTokenNotFound", err)
 	}
 
-	if err := store.SetString("token-v2", `{"access_token":"abc"}`); err != nil {
-		t.Fatalf("SetString() error = %v, want nil", err)
+	want := &oauth2.Token{AccessToken: "abc", RefreshToken: "refresh"}
+	if err := store.Set(ctx, "token-v2", want); err != nil {
+		t.Fatalf("Set() error = %v, want nil", err)
 	}
 
-	got, err := store.GetString("token-v2")
+	got, err := store.Get(ctx, "token-v2")
 	if err != nil {
-		t.Fatalf("GetString() error = %v, want nil", err)
+		t.Fatalf("Get() error = %v, want nil", err)
 	}
-	if got != `{"access_token":"abc"}` {
-		t.Fatalf("GetString() = %q, want stored token", got)
+	if got.AccessToken != want.AccessToken || got.RefreshToken != want.RefreshToken {
+		t.Fatalf("Get() = %+v, want %+v", got, want)
 	}
 
 	info, err := os.Stat(path)
@@ -40,52 +47,72 @@ func TestFileTokenStoreRoundTrip(t *testing.T) {
 }
 
 func TestFileTokenStoreKeepsOtherKeys(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "token.json")
-	store, err := NewFileTokenStore(path)
+	ctx := context.Background()
+	store, err := NewFileTokenStore(filepath.Join(t.TempDir(), "token.json"))
 	if err != nil {
 		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
 	}
 
-	if err := store.SetString("token-v2", "first"); err != nil {
-		t.Fatalf("SetString(token-v2) error = %v, want nil", err)
+	if err := store.Set(ctx, "token-v2", &oauth2.Token{AccessToken: "first"}); err != nil {
+		t.Fatalf("Set(token-v2) error = %v, want nil", err)
 	}
-	if err := store.SetString("other", "second"); err != nil {
-		t.Fatalf("SetString(other) error = %v, want nil", err)
-	}
-
-	first, err := store.GetString("token-v2")
-	if err != nil {
-		t.Fatalf("GetString(token-v2) error = %v, want nil", err)
-	}
-	if first != "first" {
-		t.Fatalf("GetString(token-v2) = %q, want %q", first, "first")
+	if err := store.Set(ctx, "other", &oauth2.Token{AccessToken: "second"}); err != nil {
+		t.Fatalf("Set(other) error = %v, want nil", err)
 	}
 
-	other, err := store.GetString("other")
+	first, err := store.Get(ctx, "token-v2")
 	if err != nil {
-		t.Fatalf("GetString(other) error = %v, want nil", err)
+		t.Fatalf("Get(token-v2) error = %v, want nil", err)
 	}
-	if other != "second" {
-		t.Fatalf("GetString(other) = %q, want %q", other, "second")
+	if first.AccessToken != "first" {
+		t.Fatalf("Get(token-v2) = %q, want %q", first.AccessToken, "first")
+	}
+
+	other, err := store.Get(ctx, "other")
+	if err != nil {
+		t.Fatalf("Get(other) error = %v, want nil", err)
+	}
+	if other.AccessToken != "second" {
+		t.Fatalf("Get(other) = %q, want %q", other.AccessToken, "second")
 	}
 }
 
 func TestFileTokenStoreMissingKey(t *testing.T) {
+	ctx := context.Background()
+	store, err := NewFileTokenStore(filepath.Join(t.TempDir(), "token.json"))
+	if err != nil {
+		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
+	}
+	if err := store.Set(ctx, "token-v2", &oauth2.Token{AccessToken: "value"}); err != nil {
+		t.Fatalf("Set() error = %v, want nil", err)
+	}
+
+	if _, err := store.Get(ctx, "another-key"); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("Get(another-key) = %v, want ErrTokenNotFound", err)
+	}
+}
+
+func TestFileTokenStoreRejectsEmptyToken(t *testing.T) {
+	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "token.json")
 	store, err := NewFileTokenStore(path)
 	if err != nil {
 		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
 	}
-	if err := store.SetString("token-v2", "value"); err != nil {
-		t.Fatalf("SetString() error = %v, want nil", err)
-	}
 
-	if _, err := store.GetString("another-key"); !errors.Is(err, ErrTokenNotFound) {
-		t.Fatalf("GetString(another-key) = %v, want ErrTokenNotFound", err)
+	if err := store.Set(ctx, "token-v2", &oauth2.Token{}); err == nil {
+		t.Fatal("Set(empty token) = nil error, want error")
+	}
+	if err := store.Set(ctx, "token-v2", nil); err == nil {
+		t.Fatal("Set(nil) = nil error, want error")
+	}
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("os.Stat(%q) = %v, want no file to be written", path, err)
 	}
 }
 
 func TestFileTokenStoreQuarantinesCorruptFile(t *testing.T) {
+	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "token.json")
 	if err := os.WriteFile(path, []byte("not json"), 0o600); err != nil {
 		t.Fatalf("os.WriteFile(%q) error = %v, want nil", path, err)
@@ -95,11 +122,11 @@ func TestFileTokenStoreQuarantinesCorruptFile(t *testing.T) {
 		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
 	}
 
-	if _, err := store.GetString("token-v2"); !errors.Is(err, ErrTokenNotFound) {
-		t.Fatalf("GetString() on corrupt file = %v, want ErrTokenNotFound so login can restart", err)
+	if _, err := store.Get(ctx, "token-v2"); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("Get() on corrupt file = %v, want ErrTokenNotFound so login can restart", err)
 	}
 
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("os.Stat(%q) = %v, want the corrupt file to be moved aside", path, err)
 	}
 	quarantined, err := filepath.Glob(path + ".corrupt-*")
@@ -118,19 +145,20 @@ func TestFileTokenStoreQuarantinesCorruptFile(t *testing.T) {
 	}
 
 	// A fresh login must be able to write the token again.
-	if err := store.SetString("token-v2", "fresh"); err != nil {
-		t.Fatalf("SetString() after quarantine error = %v, want nil", err)
+	if err := store.Set(ctx, "token-v2", &oauth2.Token{AccessToken: "fresh"}); err != nil {
+		t.Fatalf("Set() after quarantine error = %v, want nil", err)
 	}
-	got, err := store.GetString("token-v2")
+	got, err := store.Get(ctx, "token-v2")
 	if err != nil {
-		t.Fatalf("GetString() after quarantine error = %v, want nil", err)
+		t.Fatalf("Get() after quarantine error = %v, want nil", err)
 	}
-	if got != "fresh" {
-		t.Fatalf("GetString() = %q, want %q", got, "fresh")
+	if got.AccessToken != "fresh" {
+		t.Fatalf("Get() = %q, want %q", got.AccessToken, "fresh")
 	}
 }
 
 func TestFileTokenStoreQuarantineDoesNotClobberExistingBackup(t *testing.T) {
+	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "token.json")
 	store, err := NewFileTokenStore(path)
 	if err != nil {
@@ -139,15 +167,15 @@ func TestFileTokenStoreQuarantineDoesNotClobberExistingBackup(t *testing.T) {
 	if err := os.WriteFile(path, []byte("first corrupt"), 0o600); err != nil {
 		t.Fatalf("os.WriteFile(%q) error = %v, want nil", path, err)
 	}
-	if _, err := store.GetString("token-v2"); !errors.Is(err, ErrTokenNotFound) {
-		t.Fatalf("first GetString() = %v, want ErrTokenNotFound", err)
+	if _, err := store.Get(ctx, "token-v2"); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("first Get() = %v, want ErrTokenNotFound", err)
 	}
 
 	if err := os.WriteFile(path, []byte("second corrupt"), 0o600); err != nil {
 		t.Fatalf("os.WriteFile(%q) error = %v, want nil", path, err)
 	}
-	if _, err := store.GetString("token-v2"); !errors.Is(err, ErrTokenNotFound) {
-		t.Fatalf("second GetString() = %v, want ErrTokenNotFound", err)
+	if _, err := store.Get(ctx, "token-v2"); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("second Get() = %v, want ErrTokenNotFound", err)
 	}
 
 	quarantined, err := filepath.Glob(path + ".corrupt-*")
@@ -156,6 +184,52 @@ func TestFileTokenStoreQuarantineDoesNotClobberExistingBackup(t *testing.T) {
 	}
 	if len(quarantined) != 2 {
 		t.Fatalf("quarantined files = %v, want two distinct backups", quarantined)
+	}
+
+	seen := map[string]bool{}
+	for _, backup := range quarantined {
+		contents, err := os.ReadFile(backup)
+		if err != nil {
+			t.Fatalf("os.ReadFile(%q) error = %v, want nil", backup, err)
+		}
+		seen[string(contents)] = true
+	}
+	if !seen["first corrupt"] || !seen["second corrupt"] {
+		t.Fatalf("quarantined contents = %v, want both backups to keep their bytes", seen)
+	}
+}
+
+func TestFileTokenStoreSweepsStaleTemps(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "token.json")
+	store, err := NewFileTokenStore(path)
+	if err != nil {
+		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
+	}
+
+	stale := filepath.Join(dir, ".token-stale.tmp")
+	if err := os.WriteFile(stale, []byte("leftover"), 0o600); err != nil {
+		t.Fatalf("os.WriteFile(%q) error = %v, want nil", stale, err)
+	}
+	old := time.Now().Add(-2 * staleTokenTempAge)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatalf("os.Chtimes(%q) error = %v, want nil", stale, err)
+	}
+	fresh := filepath.Join(dir, ".token-fresh.tmp")
+	if err := os.WriteFile(fresh, []byte("in flight"), 0o600); err != nil {
+		t.Fatalf("os.WriteFile(%q) error = %v, want nil", fresh, err)
+	}
+
+	if err := store.Set(ctx, "token-v2", &oauth2.Token{AccessToken: "value"}); err != nil {
+		t.Fatalf("Set() error = %v, want nil", err)
+	}
+
+	if _, err := os.Stat(stale); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("os.Stat(%q) = %v, want stale temp removed", stale, err)
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Fatalf("os.Stat(%q) = %v, want recent temp kept", fresh, err)
 	}
 }
 
@@ -174,8 +248,8 @@ func TestFileTokenStoreDefaultsToConfigDir(t *testing.T) {
 		t.Fatalf("NewFileTokenStore(\"\") error = %v, want nil", err)
 	}
 	want := filepath.Join(configDir, "lazyspotify", defaultTokenFileName)
-	if got := store.Path(); got != want {
-		t.Fatalf("Path() = %q, want %q", got, want)
+	if got := store.path; got != want {
+		t.Fatalf("path = %q, want %q", got, want)
 	}
 }
 
@@ -193,8 +267,8 @@ func TestFileTokenStoreResolvesRelativePathFromConfigDir(t *testing.T) {
 		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
 	}
 	want := filepath.Join(configDir, "lazyspotify", "secrets", "token.json")
-	if got := store.Path(); got != want {
-		t.Fatalf("Path() = %q, want %q", got, want)
+	if got := store.path; got != want {
+		t.Fatalf("path = %q, want %q", got, want)
 	}
 }
 
@@ -207,7 +281,34 @@ func TestFileTokenStoreExpandsHome(t *testing.T) {
 		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
 	}
 	want := filepath.Join(homeDir, "lazyspotify-token.json")
-	if got := store.Path(); got != want {
-		t.Fatalf("Path() = %q, want %q", got, want)
+	if got := store.path; got != want {
+		t.Fatalf("path = %q, want %q", got, want)
+	}
+}
+
+func TestNewFileTokenStoreRejectsBareTilde(t *testing.T) {
+	for _, path := range []string{"~", "~/"} {
+		if _, err := NewFileTokenStore(path); err == nil {
+			t.Fatalf("NewFileTokenStore(%q) = nil error, want a file path error", path)
+		}
+	}
+}
+
+func TestHasLoosePermissions(t *testing.T) {
+	tests := []struct {
+		mode fs.FileMode
+		want bool
+	}{
+		{mode: 0o600, want: false},
+		{mode: 0o400, want: false},
+		{mode: 0o640, want: true},
+		{mode: 0o604, want: true},
+		{mode: 0o644, want: true},
+	}
+
+	for _, tt := range tests {
+		if got := hasLoosePermissions(tt.mode); got != tt.want {
+			t.Fatalf("hasLoosePermissions(%o) = %t, want %t", tt.mode, got, tt.want)
+		}
 	}
 }

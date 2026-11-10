@@ -6,10 +6,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-type TickFastMsg struct {}
-type TickClickMsg struct {}
-type TickMsg struct {}
-type TickMsgVolume struct {}
+type TickFastMsg struct{}
+type TickClickMsg struct{}
+type TickMsg struct{}
+type TickMsgVolume struct{}
 
 func DoTickFast() tea.Cmd {
 	return tea.Tick(180*time.Millisecond, func(t time.Time) tea.Msg {
@@ -36,5 +36,5 @@ func DoTickVolume() tea.Cmd {
 }
 
 func StartTicker() tea.Cmd {
-	return tea.Batch(DoTickFast(), DoTickClick(),DoTick())
+	return tea.Batch(DoTickFast(), DoTickClick(), DoTick())
 }

@@ -11,112 +11,190 @@ import (
 	"time"
 
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
+	"golang.org/x/oauth2"
 )
 
 const (
 	defaultCommandTimeout = 10 * time.Second
-	// commandStderrLimit caps how much command output ends up in errors so a
-	// chatty secret manager cannot flood the log or the auth screen.
-	commandStderrLimit = 300
+	// commandStdoutLimit and commandStderrLimit cap how much output is kept so
+	// a chatty or hostile secret manager cannot exhaust memory.
+	commandStdoutLimit = 64 << 10
+	commandStderrLimit = 4 << 10
+	// commandErrorLimit is how many stderr runes end up in an error message.
+	commandErrorLimit = 300
 	// tokenKeyEnv lets command backends use the configured token key without
 	// it being baked into their argv.
 	tokenKeyEnv = "LAZYSPOTIFY_TOKEN_KEY"
 )
 
 // CommandTokenStore keeps tokens in an external secret manager. The get
-// command must print the secret on stdout (a trailing newline is fine) and
-// exit non-zero when no secret is stored yet; the set command receives the
-// secret on stdin. This is how `pass`, `oo7`, and similar tools integrate.
+// command prints the token's JSON on stdout and exits with one of the
+// configured not-found exit codes when no token is stored yet; the set command
+// receives the token JSON on stdin. This is how `pass`, `oo7`, and similar
+// tools integrate.
 type CommandTokenStore struct {
-	getCmd  []string
-	setCmd  []string
-	timeout time.Duration
+	getCmd            []string
+	setCmd            []string
+	notFoundExitCodes map[int]struct{}
+	anyExitIsNotFound bool
+	timeout           time.Duration
 }
 
-func NewCommandTokenStore(getCmd, setCmd []string, timeout time.Duration) (*CommandTokenStore, error) {
+func NewCommandTokenStore(getCmd, setCmd []string, notFoundExitCodes []int, timeout time.Duration) (*CommandTokenStore, error) {
 	if len(getCmd) == 0 {
-		return nil, fmt.Errorf("missing command token store get command")
+		return nil, errors.New("missing required config value `auth.token-store.command.get`")
 	}
 	if len(setCmd) == 0 {
-		return nil, fmt.Errorf("missing command token store set command")
+		return nil, errors.New("missing required config value `auth.token-store.command.set`")
+	}
+
+	codes := make(map[int]struct{}, len(notFoundExitCodes))
+	for _, code := range notFoundExitCodes {
+		if code < 0 {
+			return nil, fmt.Errorf(
+				"invalid config value `auth.token-store.command.not-found-exit-codes`: %d; exit codes must be zero or positive",
+				code,
+			)
+		}
+		codes[code] = struct{}{}
 	}
 	if timeout <= 0 {
 		timeout = defaultCommandTimeout
 	}
+
 	return &CommandTokenStore{
-		getCmd:  append([]string(nil), getCmd...),
-		setCmd:  append([]string(nil), setCmd...),
-		timeout: timeout,
+		getCmd: append([]string(nil), getCmd...),
+		setCmd: append([]string(nil), setCmd...),
+		// An empty list keeps the historical behaviour: any non-zero exit
+		// means "no token yet".
+		notFoundExitCodes: codes,
+		anyExitIsNotFound: len(codes) == 0,
+		timeout:           timeout,
 	}, nil
 }
 
-func (c *CommandTokenStore) GetString(key string) (string, error) {
-	stdout, stderr, err := c.run(c.getCmd, key, "")
+func (c *CommandTokenStore) Get(ctx context.Context, key string) (*oauth2.Token, error) {
+	stdout, stderr, err := c.run(ctx, c.getCmd, key, "")
 	if err != nil {
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			// Secret managers exit non-zero for "no such entry", which is the
-			// same state as an empty store and should lead to a fresh login.
-			logger.Log.Debug().
+		if errors.As(err, &exitErr) && c.isNotFoundExitCode(exitErr.ExitCode()) {
+			logger.Log.Warn().
 				Err(err).
-				Str("command", c.getCmd[0]).
+				Str("command", strings.Join(c.getCmd, " ")).
+				Int("exit_code", exitErr.ExitCode()).
 				Str("stderr", truncate(stderr)).
-				Msg("token get command exited non-zero; treating token as missing")
-			return "", ErrTokenNotFound
+				Msg("token get command reported a missing token; login required")
+			return nil, ErrTokenNotFound
 		}
-		return "", fmt.Errorf("run token get command %q: %w", c.getCmd[0], err)
+		return nil, commandError("get", c.getCmd, err, stderr)
 	}
 
 	value := strings.TrimRight(stdout, "\r\n")
 	if value == "" {
-		logger.Log.Debug().
-			Str("command", c.getCmd[0]).
+		logger.Log.Warn().
+			Str("command", strings.Join(c.getCmd, " ")).
 			Msg("token get command returned an empty secret; treating token as missing")
-		return "", ErrTokenNotFound
+		return nil, ErrTokenNotFound
 	}
-	return value, nil
+	return decodeToken(key, value)
 }
 
-func (c *CommandTokenStore) SetString(key, value string) error {
-	_, stderr, err := c.run(c.setCmd, key, value)
+func (c *CommandTokenStore) Set(ctx context.Context, key string, token *oauth2.Token) error {
+	encoded, err := encodeToken(token)
 	if err != nil {
-		if message := truncate(stderr); message != "" {
-			return fmt.Errorf("run token set command %q: %w: %s", c.setCmd[0], err, message)
-		}
-		return fmt.Errorf("run token set command %q: %w", c.setCmd[0], err)
+		return err
+	}
+	_, stderr, err := c.run(ctx, c.setCmd, key, encoded)
+	if err != nil {
+		return commandError("set", c.setCmd, err, stderr)
 	}
 	return nil
 }
 
-// run executes argv with the token key exported and returns both output
-// streams. Exit errors are returned unwrapped so callers can tell a missing
-// secret from a command that could not run at all.
-func (c *CommandTokenStore) run(argv []string, key, input string) (string, string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+func (c *CommandTokenStore) isNotFoundExitCode(code int) bool {
+	if c.anyExitIsNotFound {
+		return true
+	}
+	_, ok := c.notFoundExitCodes[code]
+	return ok
+}
+
+// run executes argv in its own process group with the token key exported and
+// returns both capped output streams. Exit errors are returned unwrapped so
+// callers can map them to "not found" or a real failure.
+func (c *CommandTokenStore) run(ctx context.Context, argv []string, key, input string) (string, string, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Env = append(os.Environ(), tokenKeyEnv+"="+key)
-	if input != "" {
-		cmd.Stdin = strings.NewReader(input)
-	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	cmd.Stdin = strings.NewReader(input)
+	stdout := newCappedBuffer(commandStdoutLimit)
+	stderr := newCappedBuffer(commandStderrLimit)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	// Keep descendants from holding the pipes open past the deadline.
+	cmd.WaitDelay = 2 * time.Second
+	configureProcessGroup(cmd)
 
 	if err := cmd.Run(); err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return "", stderr.String(), fmt.Errorf("timed out after %s", c.timeout)
+			return stdout.String(), stderr.String(), fmt.Errorf("timed out after %s", c.timeout)
 		}
 		return stdout.String(), stderr.String(), err
 	}
 	return stdout.String(), stderr.String(), nil
 }
 
+// commandError describes a failing token command without leaking more output
+// than a person needs to diagnose it.
+func commandError(action string, argv []string, err error, stderr string) error {
+	command := strings.Join(argv, " ")
+	if message := truncate(stderr); message != "" {
+		return fmt.Errorf("token %s command %q failed: %w: %s", action, command, err, message)
+	}
+	return fmt.Errorf("token %s command %q failed: %w", action, command, err)
+}
+
+// cappedBuffer keeps at most limit bytes and records that it truncated.
+type cappedBuffer struct {
+	limit     int
+	buf       bytes.Buffer
+	truncated bool
+}
+
+func newCappedBuffer(limit int) *cappedBuffer {
+	return &cappedBuffer{limit: limit}
+}
+
+func (c *cappedBuffer) Write(p []byte) (int, error) {
+	remaining := c.limit - c.buf.Len()
+	if remaining <= 0 {
+		if len(p) > 0 {
+			c.truncated = true
+		}
+		return len(p), nil
+	}
+	if len(p) > remaining {
+		_, _ = c.buf.Write(p[:remaining])
+		c.truncated = true
+		return len(p), nil
+	}
+	return c.buf.Write(p)
+}
+
+func (c *cappedBuffer) String() string {
+	if !c.truncated {
+		return c.buf.String()
+	}
+	return strings.ToValidUTF8(c.buf.String(), "") + "…"
+}
+
 func truncate(value string) string {
 	value = strings.TrimSpace(value)
-	if len(value) <= commandStderrLimit {
+	runes := []rune(value)
+	if len(runes) <= commandErrorLimit {
 		return value
 	}
-	return value[:commandStderrLimit] + "…"
+	return string(runes[:commandErrorLimit]) + "…"
 }

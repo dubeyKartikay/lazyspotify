@@ -3,10 +3,12 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/spf13/viper"
 )
 
 const SpotifyClientIDHelpURL = "https://github.com/dubeyKartikay/lazyspotify?tab=readme-ov-file#set-up-your-spotify-client-id"
@@ -26,12 +28,17 @@ const (
 	defaultTokenStoreCommandTimeout = 10
 )
 
-// SupportedTokenStoreBackends lists the accepted auth.token-store.backend
-// values, in the order they are documented.
-var SupportedTokenStoreBackends = []string{
+var supportedTokenStoreBackends = []string{
 	TokenStoreBackendKeyring,
 	TokenStoreBackendFile,
 	TokenStoreBackendCommand,
+}
+
+// SupportedTokenStoreBackends lists the accepted auth.token-store.backend
+// values, in the order they are documented. The copy keeps callers from
+// changing validation text.
+func SupportedTokenStoreBackends() []string {
+	return append([]string(nil), supportedTokenStoreBackends...)
 }
 
 // NormalizeTokenStoreBackend lowercases the configured backend and falls back
@@ -74,13 +81,15 @@ type AppConfig struct {
 		} `mapstructure:"keyring"`
 		TokenStore struct {
 			Backend string `mapstructure:"backend"`
+			Key     string `mapstructure:"key"`
 			File    struct {
 				Path string `mapstructure:"path"`
 			} `mapstructure:"file"`
 			Command struct {
-				Get     []string `mapstructure:"get"`
-				Set     []string `mapstructure:"set"`
-				Timeout int      `mapstructure:"timeout"`
+				Get               []string `mapstructure:"get"`
+				Set               []string `mapstructure:"set"`
+				NotFoundExitCodes []int    `mapstructure:"not-found-exit-codes"`
+				Timeout           int      `mapstructure:"timeout"`
 			} `mapstructure:"command"`
 		} `mapstructure:"token-store"`
 	} `mapstructure:"auth"`
@@ -102,6 +111,15 @@ type AppConfig struct {
 
 func (c AppConfig) SpotifyClientID() string {
 	return strings.TrimSpace(c.Auth.ClientID)
+}
+
+// AuthTokenKey returns the key the token is stored under. auth.token-store.key
+// is canonical; auth.keyring.key stays a deprecated alias.
+func (c AppConfig) AuthTokenKey() string {
+	if key := strings.TrimSpace(c.Auth.TokenStore.Key); key != "" {
+		return key
+	}
+	return strings.TrimSpace(c.Auth.Keyring.Key)
 }
 
 func getDefaultAppConfig() AppConfig {
@@ -145,7 +163,14 @@ func LoadConfig() (AppConfig, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	v.AutomaticEnv()
 	var config AppConfig
-	err = v.Unmarshal(&config)
+	err = v.Unmarshal(&config, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		// Env overrides for argv fields arrive as strings; shell-split them.
+		stringToShellWordsHook,
+		// Keep viper's defaults for every other string-to-slice target.
+		stringToIntSliceHook,
+		mapstructure.StringToSliceHookFunc(","),
+		mapstructure.StringToTimeDurationHookFunc(),
+	)))
 	if err != nil {
 		return AppConfig{}, err
 	}
@@ -169,8 +194,10 @@ func validateStartupConfig(cfg AppConfig) error {
 func validateTokenStoreConfig(cfg AppConfig) error {
 	store := cfg.Auth.TokenStore
 	switch NormalizeTokenStoreBackend(store.Backend) {
-	case TokenStoreBackendKeyring, TokenStoreBackendFile:
+	case TokenStoreBackendKeyring:
 		return nil
+	case TokenStoreBackendFile:
+		return validateTokenFilePath(store.File.Path)
 	case TokenStoreBackendCommand:
 		if len(store.Command.Get) == 0 {
 			return fmt.Errorf("missing required config value `auth.token-store.command.get` for the command token store")
@@ -178,14 +205,39 @@ func validateTokenStoreConfig(cfg AppConfig) error {
 		if len(store.Command.Set) == 0 {
 			return fmt.Errorf("missing required config value `auth.token-store.command.set` for the command token store")
 		}
+		for _, code := range store.Command.NotFoundExitCodes {
+			if code < 0 {
+				return fmt.Errorf(
+					"invalid config value `auth.token-store.command.not-found-exit-codes`: %d; exit codes must be zero or positive",
+					code,
+				)
+			}
+		}
 		return nil
 	default:
 		return fmt.Errorf(
 			"unsupported config value `auth.token-store.backend: %s`; supported backends: %s",
 			store.Backend,
-			strings.Join(SupportedTokenStoreBackends, ", "),
+			strings.Join(SupportedTokenStoreBackends(), ", "),
 		)
 	}
+}
+
+func validateTokenFilePath(path string) error {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "~" || trimmed == "~/" {
+		return fmt.Errorf(
+			"invalid config value `auth.token-store.file.path: %s`; set a file path such as ~/token.json",
+			trimmed,
+		)
+	}
+	if strings.HasSuffix(trimmed, "/") {
+		return fmt.Errorf(
+			"invalid config value `auth.token-store.file.path: %s`; the path must name a file, not a directory",
+			trimmed,
+		)
+	}
+	return nil
 }
 
 func ensureAppConfigFile() (string, error) {
@@ -208,6 +260,11 @@ func ensureAppConfigFile() (string, error) {
 		return "", err
 	}
 	return configDir, nil
+}
+
+// ConfigDir reports the lazyspotify config directory without creating it.
+func ConfigDir() string {
+	return getConfigDir()
 }
 
 func getConfigDir() string {
@@ -235,9 +292,11 @@ func applyConfigDefaults(v *viper.Viper) {
 	v.SetDefault("auth.keyring.service", defaults.Auth.Keyring.Service)
 	v.SetDefault("auth.keyring.key", defaults.Auth.Keyring.Key)
 	v.SetDefault("auth.token-store.backend", defaults.Auth.TokenStore.Backend)
+	v.SetDefault("auth.token-store.key", defaults.Auth.TokenStore.Key)
 	v.SetDefault("auth.token-store.file.path", defaults.Auth.TokenStore.File.Path)
 	v.SetDefault("auth.token-store.command.get", defaults.Auth.TokenStore.Command.Get)
 	v.SetDefault("auth.token-store.command.set", defaults.Auth.TokenStore.Command.Set)
+	v.SetDefault("auth.token-store.command.not-found-exit-codes", defaults.Auth.TokenStore.Command.NotFoundExitCodes)
 	v.SetDefault("auth.token-store.command.timeout", defaults.Auth.TokenStore.Command.Timeout)
 	v.SetDefault("librespot.host", defaults.Librespot.Host)
 	v.SetDefault("librespot.port", defaults.Librespot.Port)

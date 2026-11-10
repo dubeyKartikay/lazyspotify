@@ -87,6 +87,6 @@ func (m *Model) InfoOpen() bool {
 	return m.mediaPanel.InfoOpen()
 }
 
-func (m *Model)IsZenMode() bool {
+func (m *Model) IsZenMode() bool {
 	return m.zenMode
 }

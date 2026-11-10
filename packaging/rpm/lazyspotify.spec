@@ -23,7 +23,9 @@ BuildRequires:  pkgconfig
 lazyspotify is a terminal Spotify client that uses a patched go-librespot
 daemon for playback.
 
-Linux users need a working Secret Service-compatible keyring at runtime.
+By default Linux users need a working Secret Service-compatible keyring at
+runtime; set auth.token-store.backend to "file" or "command" to store the
+login token without one (for example on headless hosts).
 Optional clipboard integration is available via wl-clipboard, xclip, or xsel.
 
 %prep

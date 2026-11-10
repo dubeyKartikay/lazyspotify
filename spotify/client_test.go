@@ -3,12 +3,13 @@ package spotify
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/zalando/go-keyring"
+	"github.com/dubeyKartikay/lazyspotify/core/auth"
 	spotifyapi "github.com/zmb3/spotify/v2"
 	"golang.org/x/oauth2"
 )
@@ -210,7 +211,8 @@ func TestIsAuthError(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{name: "missing keyring token", err: keyring.ErrNotFound, want: true},
+		{name: "missing token", err: auth.ErrTokenNotFound, want: true},
+		{name: "wrapped missing token", err: fmt.Errorf("store: %w", auth.ErrTokenNotFound), want: true},
 		{name: "spotify unauthorized", err: spotifyapi.Error{Status: http.StatusUnauthorized, Message: "unauthorized"}, want: true},
 		{name: "spotify forbidden", err: spotifyapi.Error{Status: http.StatusForbidden, Message: "forbidden"}, want: false},
 		{name: "oauth invalid grant", err: &oauth2.RetrieveError{ErrorCode: "invalid_grant"}, want: true},

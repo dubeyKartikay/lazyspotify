@@ -1,34 +1,42 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"runtime"
 
 	"github.com/zalando/go-keyring"
+	"golang.org/x/oauth2"
 )
 
-// Keyring stores tokens in the system keyring through Secret Service on Linux
-// and the platform equivalents elsewhere. It implements TokenStore.
-type Keyring struct {
+// KeyringStore stores tokens in the system keyring through Secret Service on
+// Linux and the platform equivalents elsewhere.
+type KeyringStore struct {
 	service string
 }
 
-// NewKeyring builds a keyring store for the given keyring service name.
-func NewKeyring(service string) *Keyring {
-	return &Keyring{service: service}
+// NewKeyringStore builds a keyring store for the given keyring service name.
+func NewKeyringStore(service string) *KeyringStore {
+	return &KeyringStore{service: service}
 }
 
-func (k *Keyring) GetString(key string) (string, error) {
+func (k *KeyringStore) Get(ctx context.Context, key string) (*oauth2.Token, error) {
+	_ = ctx
 	value, err := keyring.Get(k.service, key)
 	if err != nil {
-		return "", wrapKeyringError(err)
+		return nil, wrapKeyringError(err)
 	}
-	return value, nil
+	return decodeToken(key, value)
 }
 
-func (k *Keyring) SetString(key, value string) error {
-	return wrapKeyringError(keyring.Set(k.service, key, value))
+func (k *KeyringStore) Set(ctx context.Context, key string, token *oauth2.Token) error {
+	_ = ctx
+	encoded, err := encodeToken(token)
+	if err != nil {
+		return err
+	}
+	return wrapKeyringError(keyring.Set(k.service, key, encoded))
 }
 
 func wrapKeyringError(err error) error {
