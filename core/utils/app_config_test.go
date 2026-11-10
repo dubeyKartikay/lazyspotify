@@ -39,6 +39,7 @@ func TestValidateStartupConfigRequiresSpotifyClientID(t *testing.T) {
 func TestValidateStartupConfigAcceptsConfiguredSpotifyClientID(t *testing.T) {
 	cfg := AppConfig{}
 	cfg.Auth.ClientID = "configured-client-id"
+	cfg.Auth.TokenStore.Key = "token-v2"
 
 	if err := validateStartupConfig(cfg); err != nil {
 		t.Fatalf("validateStartupConfig() error = %v, want nil", err)
@@ -172,6 +173,12 @@ func TestGetDefaultAppConfigUsesSystemKeyring(t *testing.T) {
 	}
 	if got := cfg.Auth.TokenStore.Command.Timeout; got != defaultTokenStoreCommandTimeout {
 		t.Fatalf("Auth.TokenStore.Command.Timeout = %d, want %d", got, defaultTokenStoreCommandTimeout)
+	}
+	if got := cfg.Auth.TokenStore.Key; got != "token-v2" {
+		t.Fatalf("Auth.TokenStore.Key = %q, want %q", got, "token-v2")
+	}
+	if got := cfg.Auth.Keyring.Key; got != "" {
+		t.Fatalf("Auth.Keyring.Key = %q, want empty (deprecated alias has no default)", got)
 	}
 }
 
@@ -425,7 +432,7 @@ func TestLoadConfigRejectsUnbalancedCommandEnvQuotes(t *testing.T) {
 }
 
 func TestValidateTokenStoreConfigRejectsBadFilePaths(t *testing.T) {
-	for _, path := range []string{"~", "~/", "/var/lib/lazyspotify/"} {
+	for _, path := range []string{"~", "~/", "~other/token.json", "/var/lib/lazyspotify/"} {
 		cfg := validConfig()
 		cfg.Auth.TokenStore.Backend = TokenStoreBackendFile
 		cfg.Auth.TokenStore.File.Path = path
@@ -440,18 +447,34 @@ func TestValidateTokenStoreConfigRejectsBadFilePaths(t *testing.T) {
 	}
 }
 
-func TestValidateTokenStoreConfigRejectsNegativeNotFoundExitCode(t *testing.T) {
+func TestValidateTokenStoreConfigRejectsNonPositiveNotFoundExitCode(t *testing.T) {
+	for _, code := range []int{-1, 0} {
+		cfg := validConfig()
+		cfg.Auth.TokenStore.Backend = TokenStoreBackendCommand
+		cfg.Auth.TokenStore.Command.Get = []string{"pass", "show", "lazyspotify/token"}
+		cfg.Auth.TokenStore.Command.Set = []string{"pass", "insert", "-m", "-f", "lazyspotify/token"}
+		cfg.Auth.TokenStore.Command.NotFoundExitCodes = []int{code}
+
+		err := validateStartupConfig(cfg)
+		if err == nil {
+			t.Fatalf("validateStartupConfig(code=%d) = nil error, want error", code)
+		}
+		if !strings.Contains(err.Error(), "not-found-exit-codes") || !strings.Contains(err.Error(), "positive") {
+			t.Fatalf("validateStartupConfig(code=%d) = %q, want the config key and positive-code guidance", code, err.Error())
+		}
+	}
+}
+
+func TestValidateStartupConfigRequiresTokenKey(t *testing.T) {
 	cfg := validConfig()
-	cfg.Auth.TokenStore.Backend = TokenStoreBackendCommand
-	cfg.Auth.TokenStore.Command.Get = []string{"pass", "show", "lazyspotify/token"}
-	cfg.Auth.TokenStore.Command.Set = []string{"pass", "insert", "-m", "-f", "lazyspotify/token"}
-	cfg.Auth.TokenStore.Command.NotFoundExitCodes = []int{-1}
+	cfg.Auth.TokenStore.Key = ""
+	cfg.Auth.Keyring.Key = ""
 
 	err := validateStartupConfig(cfg)
 	if err == nil {
-		t.Fatal("validateStartupConfig() = nil error, want negative exit code error")
+		t.Fatal("validateStartupConfig() = nil error, want missing token key error")
 	}
-	if !strings.Contains(err.Error(), "not-found-exit-codes") {
+	if !strings.Contains(err.Error(), "auth.token-store.key") {
 		t.Fatalf("validateStartupConfig() = %q, want the config key", err.Error())
 	}
 }
@@ -520,6 +543,96 @@ func TestLoadConfigAllowsNotFoundExitCodesEnvOverride(t *testing.T) {
 	got := cfg.Auth.TokenStore.Command.NotFoundExitCodes
 	if len(got) != 2 || got[0] != 1 || got[1] != 3 {
 		t.Fatalf("NotFoundExitCodes = %v, want [1 3]", got)
+	}
+}
+
+func TestLoadConfigAppliesDeprecatedKeyringKeyAlias(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+
+	configDir := getConfigDir()
+	if err := EnsureExists(configDir); err != nil {
+		t.Fatalf("EnsureExists(%q) error = %v, want nil", configDir, err)
+	}
+	config := strings.Join([]string{
+		"auth:",
+		"  client_id: existing-client-id",
+		"  keyring:",
+		"    key: legacy-key",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(configDir, appConfigFileName), []byte(config), 0644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v, want nil", err)
+	}
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v, want nil", err)
+	}
+	if got := cfg.AuthTokenKey(); got != "legacy-key" {
+		t.Fatalf("AuthTokenKey() = %q, want %q from the deprecated alias", got, "legacy-key")
+	}
+}
+
+func TestLoadConfigCanonicalTokenKeyWinsOverAlias(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+
+	configDir := getConfigDir()
+	if err := EnsureExists(configDir); err != nil {
+		t.Fatalf("EnsureExists(%q) error = %v, want nil", configDir, err)
+	}
+	config := strings.Join([]string{
+		"auth:",
+		"  client_id: existing-client-id",
+		"  keyring:",
+		"    key: legacy-key",
+		"  token-store:",
+		"    key: canonical-key",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(configDir, appConfigFileName), []byte(config), 0644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v, want nil", err)
+	}
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v, want nil", err)
+	}
+	if got := cfg.AuthTokenKey(); got != "canonical-key" {
+		t.Fatalf("AuthTokenKey() = %q, want %q", got, "canonical-key")
+	}
+}
+
+func TestLoadConfigAppliesDeprecatedKeyringKeyEnvAlias(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+	t.Setenv("AUTH_KEYRING_KEY", "legacy-env-key")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v, want nil", err)
+	}
+	if got := cfg.AuthTokenKey(); got != "legacy-env-key" {
+		t.Fatalf("AuthTokenKey() = %q, want %q from AUTH_KEYRING_KEY", got, "legacy-env-key")
+	}
+}
+
+func TestLoadConfigReportsIntegerParseErrors(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+	t.Setenv("AUTH_TOKEN_STORE_COMMAND_NOT_FOUND_EXIT_CODES", "one")
+
+	_, err := LoadConfig()
+	if err == nil {
+		t.Fatal("LoadConfig() = nil error, want integer parse error")
+	}
+	if !strings.Contains(err.Error(), "failed to parse config") || !strings.Contains(err.Error(), "invalid integer") {
+		t.Fatalf("LoadConfig() = %q, want parse context", err.Error())
 	}
 }
 

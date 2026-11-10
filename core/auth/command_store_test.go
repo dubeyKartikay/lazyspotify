@@ -185,13 +185,100 @@ func TestCommandTokenStoreExitCodes(t *testing.T) {
 	})
 }
 
-func TestNewCommandTokenStoreRejectsNegativeExitCode(t *testing.T) {
-	_, err := NewCommandTokenStore([]string{"sh"}, []string{"sh"}, []int{-1}, time.Second)
-	if err == nil {
-		t.Fatal("NewCommandTokenStore(negative code) = nil error, want error")
+func TestNewCommandTokenStoreRejectsNonPositiveExitCode(t *testing.T) {
+	for _, code := range []int{-1, 0} {
+		_, err := NewCommandTokenStore([]string{"sh"}, []string{"sh"}, []int{code}, time.Second)
+		if err == nil {
+			t.Fatalf("NewCommandTokenStore(%d) = nil error, want error", code)
+		}
+		if !strings.Contains(err.Error(), "not-found-exit-codes") {
+			t.Fatalf("NewCommandTokenStore(%d) = %q, want the config key in the error", code, err.Error())
+		}
+		if !strings.Contains(err.Error(), "positive") {
+			t.Fatalf("NewCommandTokenStore(%d) = %q, want positive-code guidance", code, err.Error())
+		}
 	}
-	if !strings.Contains(err.Error(), "not-found-exit-codes") {
-		t.Fatalf("NewCommandTokenStore() = %q, want the config key in the error", err.Error())
+}
+
+func TestCommandTokenStoreSignalKilledIsAnError(t *testing.T) {
+	requireSh(t)
+	store, err := NewCommandTokenStore(
+		[]string{"sh", "-c", "kill -9 $$"},
+		[]string{"sh", "-c", `cat > /dev/null`},
+		nil,
+		time.Second,
+	)
+	if err != nil {
+		t.Fatalf("NewCommandTokenStore() error = %v, want nil", err)
+	}
+
+	_, err = store.Get(context.Background(), "token-v2")
+	if err == nil {
+		t.Fatal("Get() = nil error, want a signal failure")
+	}
+	if errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("Get() = %v, signal kill was treated as a missing token", err)
+	}
+	if !strings.Contains(err.Error(), "token get command") {
+		t.Fatalf("Get() = %q, want the command in the error", err.Error())
+	}
+}
+
+func TestCommandTokenStoreOversizedStdoutIsAnError(t *testing.T) {
+	requireSh(t)
+	store, err := NewCommandTokenStore(
+		[]string{"sh", "-c", `printf '{"access_token":"x"}'; printf '%70000s' ''`},
+		[]string{"sh", "-c", `cat > /dev/null`},
+		nil,
+		time.Second,
+	)
+	if err != nil {
+		t.Fatalf("NewCommandTokenStore() error = %v, want nil", err)
+	}
+
+	_, err = store.Get(context.Background(), "token-v2")
+	if err == nil {
+		t.Fatal("Get() = nil error, want an oversized-output error")
+	}
+	if errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("Get() = %v, truncated output was treated as a missing token", err)
+	}
+	if !strings.Contains(err.Error(), "stdout") || !strings.Contains(err.Error(), "truncated") {
+		t.Fatalf("Get() = %q, want a truncated-output error", err.Error())
+	}
+}
+
+func TestCommandTokenStoreCanceledContextIsAnError(t *testing.T) {
+	requireSh(t)
+	store, err := NewCommandTokenStore(
+		[]string{"sh", "-c", "sleep 30"},
+		[]string{"sh", "-c", `cat > /dev/null`},
+		nil,
+		10*time.Second,
+	)
+	if err != nil {
+		t.Fatalf("NewCommandTokenStore() error = %v, want nil", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	_, err = store.Get(ctx, "token-v2")
+	if err == nil {
+		t.Fatal("Get() = nil error, want a cancellation error")
+	}
+	if errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("Get() = %v, cancellation was treated as a missing token", err)
+	}
+	if !strings.Contains(err.Error(), "canceled") {
+		t.Fatalf("Get() = %q, want cancellation context", err.Error())
+	}
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Fatalf("Get() took %s, want it to stop at cancellation", elapsed)
 	}
 }
 
@@ -290,26 +377,27 @@ func TestNewCommandTokenStoreDefaultsTimeout(t *testing.T) {
 	}
 }
 
-func TestCappedBufferLimitsAndKeepsUTF8(t *testing.T) {
+func TestCappedBufferKeepsRawPrefixAndReportsTruncation(t *testing.T) {
 	buffer := newCappedBuffer(5)
 	if _, err := buffer.Write([]byte("abcdef")); err != nil {
 		t.Fatalf("Write() error = %v, want nil", err)
 	}
-	if got := buffer.String(); got != "abcde…" {
-		t.Fatalf("String() = %q, want %q", got, "abcde…")
+	if got := buffer.String(); got != "abcde" {
+		t.Fatalf("String() = %q, want the raw prefix %q", got, "abcde")
+	}
+	if !buffer.Truncated() {
+		t.Fatal("Truncated() = false, want true")
 	}
 
-	// "a" + "é" (2 bytes) + a truncated "é" cannot be sliced by bytes.
-	buffer = newCappedBuffer(4)
-	if _, err := buffer.Write([]byte("aéé")); err != nil {
+	buffer = newCappedBuffer(10)
+	if _, err := buffer.Write([]byte("short")); err != nil {
 		t.Fatalf("Write() error = %v, want nil", err)
 	}
-	got := buffer.String()
-	if !utf8.ValidString(got) {
-		t.Fatalf("String() = %q, want valid UTF-8", got)
+	if got := buffer.String(); got != "short" {
+		t.Fatalf("String() = %q, want %q", got, "short")
 	}
-	if got != "aé…" {
-		t.Fatalf("String() = %q, want %q", got, "aé…")
+	if buffer.Truncated() {
+		t.Fatal("Truncated() = true, want false")
 	}
 }
 

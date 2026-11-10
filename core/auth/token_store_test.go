@@ -167,6 +167,19 @@ func TestEncodeTokenRejectsUnusableTokens(t *testing.T) {
 	}
 }
 
+func TestErrorTokenStoreReturnsConstructionError(t *testing.T) {
+	ctx := context.Background()
+	root := errors.New("bad token store config")
+	store := errorTokenStore{err: root}
+
+	if _, err := store.Get(ctx, "token-v2"); !errors.Is(err, root) {
+		t.Fatalf("Get() = %v, want the construction error", err)
+	}
+	if err := store.Set(ctx, "token-v2", &oauth2.Token{AccessToken: "x"}); !errors.Is(err, root) {
+		t.Fatalf("Set() = %v, want the construction error", err)
+	}
+}
+
 func TestStoreRejectsBlankTokenOnSet(t *testing.T) {
 	ctx := context.Background()
 	store, err := NewFileTokenStore(filepath.Join(t.TempDir(), "token.json"))

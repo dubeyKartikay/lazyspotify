@@ -130,7 +130,7 @@ func getDefaultAppConfig() AppConfig {
 	cfg.Auth.RedirectEndpoint = "/callback"
 	cfg.Auth.Timeout = 30
 	cfg.Auth.Keyring.Service = "spotify"
-	cfg.Auth.Keyring.Key = "token-v2"
+	cfg.Auth.TokenStore.Key = "token-v2"
 	cfg.Auth.TokenStore.Backend = TokenStoreBackendKeyring
 	cfg.Auth.TokenStore.Command.Timeout = defaultTokenStoreCommandTimeout
 	cfg.Librespot.Host = "127.0.0.1"
@@ -172,9 +172,25 @@ func LoadConfig() (AppConfig, error) {
 		mapstructure.StringToTimeDurationHookFunc(),
 	)))
 	if err != nil {
-		return AppConfig{}, err
+		return AppConfig{}, fmt.Errorf("failed to parse config: %w", err)
 	}
+	applyDeprecatedTokenKey(v, &config)
 	return config, nil
+}
+
+// applyDeprecatedTokenKey lets existing configs keep their custom
+// auth.keyring.key while auth.token-store.key carries the default. The
+// deprecated value only wins when the canonical key was not set explicitly.
+func applyDeprecatedTokenKey(v *viper.Viper, cfg *AppConfig) {
+	if v.InConfig("auth.token-store.key") || os.Getenv("AUTH_TOKEN_STORE_KEY") != "" {
+		return
+	}
+	if !v.InConfig("auth.keyring.key") && os.Getenv("AUTH_KEYRING_KEY") == "" {
+		return
+	}
+	if key := strings.TrimSpace(cfg.Auth.Keyring.Key); key != "" {
+		cfg.Auth.TokenStore.Key = key
+	}
 }
 
 func ValidateStartupConfig() error {
@@ -187,6 +203,9 @@ func ValidateStartupConfig() error {
 func validateStartupConfig(cfg AppConfig) error {
 	if clientID := cfg.SpotifyClientID(); clientID == "" || clientID == spotifyClientIDPlaceholder {
 		return fmt.Errorf("missing required config value `auth.client_id`; see %s", SpotifyClientIDHelpURL)
+	}
+	if key := cfg.AuthTokenKey(); key == "" {
+		return fmt.Errorf("missing required config value `auth.token-store.key`")
 	}
 	return validateTokenStoreConfig(cfg)
 }
@@ -205,10 +224,12 @@ func validateTokenStoreConfig(cfg AppConfig) error {
 		if len(store.Command.Set) == 0 {
 			return fmt.Errorf("missing required config value `auth.token-store.command.set` for the command token store")
 		}
+		// Authoritative startup check; NewCommandTokenStore repeats it for
+		// programmatic callers.
 		for _, code := range store.Command.NotFoundExitCodes {
-			if code < 0 {
+			if code <= 0 {
 				return fmt.Errorf(
-					"invalid config value `auth.token-store.command.not-found-exit-codes`: %d; exit codes must be zero or positive",
+					"invalid config value `auth.token-store.command.not-found-exit-codes`: %d; exit codes must be positive",
 					code,
 				)
 			}
@@ -228,6 +249,12 @@ func validateTokenFilePath(path string) error {
 	if trimmed == "~" || trimmed == "~/" {
 		return fmt.Errorf(
 			"invalid config value `auth.token-store.file.path: %s`; set a file path such as ~/token.json",
+			trimmed,
+		)
+	}
+	if strings.HasPrefix(trimmed, "~") && !strings.HasPrefix(trimmed, "~/") {
+		return fmt.Errorf(
+			"invalid config value `auth.token-store.file.path: %s`; only ~/ home expansion is supported",
 			trimmed,
 		)
 	}

@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -291,6 +292,37 @@ func TestNewFileTokenStoreRejectsBareTilde(t *testing.T) {
 		if _, err := NewFileTokenStore(path); err == nil {
 			t.Fatalf("NewFileTokenStore(%q) = nil error, want a file path error", path)
 		}
+	}
+}
+
+func TestNewFileTokenStoreRejectsUnsupportedTildePrefix(t *testing.T) {
+	for _, path := range []string{"~other/token.json", "~other"} {
+		_, err := NewFileTokenStore(path)
+		if err == nil {
+			t.Fatalf("NewFileTokenStore(%q) = nil error, want an unsupported ~ expansion error", path)
+		}
+		if !strings.Contains(err.Error(), "only ~/") {
+			t.Fatalf("NewFileTokenStore(%q) = %q, want the ~/ hint", path, err.Error())
+		}
+	}
+}
+
+func TestNewFileTokenStoreTrimsWhitespacePath(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatalf("os.UserConfigDir() error = %v, want nil", err)
+	}
+
+	store, err := NewFileTokenStore("   ")
+	if err != nil {
+		t.Fatalf("NewFileTokenStore() error = %v, want nil", err)
+	}
+	want := filepath.Join(configDir, "lazyspotify", defaultTokenFileName)
+	if got := store.path; got != want {
+		t.Fatalf("path = %q, want the default %q", got, want)
 	}
 }
 

@@ -39,6 +39,7 @@ type FileTokenStore struct {
 // resolve against that directory so the file does not depend on the working
 // directory lazyspotify was started from.
 func NewFileTokenStore(path string) (*FileTokenStore, error) {
+	path = strings.TrimSpace(path)
 	resolved, err := expandHome(path)
 	if err != nil {
 		return nil, err
@@ -183,18 +184,23 @@ func quarantineTokenFile(path string) (string, error) {
 // sweepStaleTokenTemps removes temporary files left behind by a crash between
 // create and rename. They hold token material, so they must not linger.
 func sweepStaleTokenTemps(dir string) {
-	matches, err := filepath.Glob(filepath.Join(dir, ".token-*.tmp"))
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
 	}
 	cutoff := time.Now().Add(-staleTokenTempAge)
-	for _, match := range matches {
-		info, err := os.Stat(match)
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, ".token-") || !strings.HasSuffix(name, ".tmp") {
+			continue
+		}
+		info, err := entry.Info()
 		if err != nil || info.ModTime().After(cutoff) {
 			continue
 		}
-		if err := os.Remove(match); err == nil {
-			logger.Log.Debug().Str("path", match).Msg("removed stale token temporary file")
+		full := filepath.Join(dir, name)
+		if err := os.Remove(full); err == nil {
+			logger.Log.Debug().Str("path", full).Msg("removed stale token temporary file")
 		}
 	}
 }
@@ -237,7 +243,10 @@ func expandHome(path string) (string, error) {
 		)
 	}
 	if !strings.HasPrefix(path, "~/") {
-		return path, nil
+		return "", fmt.Errorf(
+			"invalid config value `auth.token-store.file.path: %s`; only ~/ home expansion is supported",
+			path,
+		)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

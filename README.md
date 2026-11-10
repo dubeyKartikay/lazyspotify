@@ -187,10 +187,10 @@ The generated daemon config is written automatically under the `librespot/` subd
 | `auth.timeout` | No | `30` | Auth server shutdown timeout in seconds. |
 | `auth.keyring.service` | No | `spotify` | Keyring service name for stored tokens. |
 | `auth.token-store.key` | No | `token-v2` | Key under which the token is stored, for every backend. |
-| `auth.keyring.key` | No | none | Deprecated alias for `auth.token-store.key`. |
+| `auth.keyring.key` | No | none | Deprecated alias for `auth.token-store.key`; used only when the canonical key is unset. |
 | `auth.token-store.backend` | No | `keyring` | Where the login token is stored: `keyring`, `file`, or `command`. See [Headless and non-keyring setups](#headless-and-non-keyring-setups). |
 | `auth.token-store.file.path` | No | `token.json` in the config directory | Token file used by the `file` backend. `~` is expanded, relative paths resolve against the config directory, and the path must name a file. |
-| `auth.token-store.command.get` | For `command` | none | Argv that prints the stored token on stdout. It must exit with one of `not-found-exit-codes` **only** when no token exists yet. |
+| `auth.token-store.command.get` | For `command` | none | Argv that prints the stored token on stdout. It must exit non-zero **only** when no token exists yet. |
 | `auth.token-store.command.set` | For `command` | none | Argv that reads a token from stdin and stores it. |
 | `auth.token-store.command.not-found-exit-codes` | No | any non-zero exit | Exit codes from `get` that mean "no token stored yet". Set this to protect real failures from being treated as a missing token. |
 | `auth.token-store.command.timeout` | No | `10` | Timeout in seconds for each token store command. |
@@ -212,12 +212,14 @@ The generated daemon config is written automatically under the `librespot/` subd
 
 Environment variables can override config values by replacing `.` and `-` with `_`. Examples: `LOG_LEVEL`, `AUTH_CLIENT_ID`, `AUTH_TOKEN_STORE_BACKEND`, `LIBRESPOT_DAEMON_LOG_LEVEL`.
 
-Argv config values (`auth.token-store.command.get`, `auth.token-store.command.set`, `librespot.daemon.cmd`) are shell-split when set from the environment, so spaces separate arguments and quotes keep them together:
+Scalar argv values (`auth.token-store.command.get`, `auth.token-store.command.set`, `librespot.daemon.cmd`) are shell-split whether they come from an environment override or a YAML string, so spaces separate arguments and quotes keep them together:
 
 ```bash
 export AUTH_TOKEN_STORE_COMMAND_GET='pass show lazyspotify/token'
 export AUTH_TOKEN_STORE_COMMAND_SET='pass insert -m -f "lazyspotify/token"'
 ```
+
+Quoting follows POSIX shell rules. On Windows, prefer setting these argv values in `config.yml` instead of the environment, because backslashes act as escapes.
 
 ### Headless and non-keyring setups
 
@@ -229,7 +231,7 @@ The default `keyring` backend needs a system keyring, which on Linux means Secre
 
 Whatever the backend, a stored value that is not a usable token (`null`, `{}`, no access and no refresh token, or invalid JSON) is treated as missing, so the next login replaces it.
 
-`command.get` must exit non-zero **only** when no token exists yet. By default any non-zero exit means "log in again"; a locked `gpg-agent` or a broken `pass` install would then trigger a login that overwrites a still-valid entry. Set `not-found-exit-codes` to the codes that really mean "missing" so other failures stop the app with the command's stderr instead.
+`command.get` must exit non-zero **only** when no token exists yet. By default any non-zero exit means "log in again"; a locked `gpg-agent` or a broken `pass` install would then trigger a login that overwrites a still-valid entry. Set `not-found-exit-codes` to the codes that really mean "missing" so other failures stop the app with the command's stderr instead. Signal-killed commands, output larger than the internal limit, and unlisted exit codes always surface as errors.
 
 Plaintext file:
 

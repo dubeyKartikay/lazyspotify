@@ -40,6 +40,9 @@ type CommandTokenStore struct {
 	timeout           time.Duration
 }
 
+// NewCommandTokenStore builds a command store. The checks here repeat the ones
+// in utils.validateTokenStoreConfig, which is authoritative for startup errors;
+// these protect callers that build a store without loading config.
 func NewCommandTokenStore(getCmd, setCmd []string, notFoundExitCodes []int, timeout time.Duration) (*CommandTokenStore, error) {
 	if len(getCmd) == 0 {
 		return nil, errors.New("missing required config value `auth.token-store.command.get`")
@@ -50,9 +53,11 @@ func NewCommandTokenStore(getCmd, setCmd []string, notFoundExitCodes []int, time
 
 	codes := make(map[int]struct{}, len(notFoundExitCodes))
 	for _, code := range notFoundExitCodes {
-		if code < 0 {
+		// Exit 0 is success and can never be an ExitError; listing it would
+		// silently disable the default any-non-zero mapping.
+		if code <= 0 {
 			return nil, fmt.Errorf(
-				"invalid config value `auth.token-store.command.not-found-exit-codes`: %d; exit codes must be zero or positive",
+				"invalid config value `auth.token-store.command.not-found-exit-codes`: %d; exit codes must be positive",
 				code,
 			)
 		}
@@ -74,22 +79,34 @@ func NewCommandTokenStore(getCmd, setCmd []string, notFoundExitCodes []int, time
 }
 
 func (c *CommandTokenStore) Get(ctx context.Context, key string) (*oauth2.Token, error) {
-	stdout, stderr, err := c.run(ctx, c.getCmd, key, "")
+	out, err := c.run(ctx, c.getCmd, key, "")
 	if err != nil {
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) && c.isNotFoundExitCode(exitErr.ExitCode()) {
+		// A negative exit code means the process died from a signal. That is
+		// a failure, never "no token yet", even under the default mapping.
+		if errors.As(err, &exitErr) && exitErr.ExitCode() >= 0 && c.isNotFoundExitCode(exitErr.ExitCode()) {
 			logger.Log.Warn().
 				Err(err).
 				Str("command", strings.Join(c.getCmd, " ")).
 				Int("exit_code", exitErr.ExitCode()).
-				Str("stderr", truncate(stderr)).
+				Str("stderr", truncate(out.stderr)).
 				Msg("token get command reported a missing token; login required")
 			return nil, ErrTokenNotFound
 		}
-		return nil, commandError("get", c.getCmd, err, stderr)
+		return nil, commandError("get", c.getCmd, err, out.stderr)
 	}
 
-	value := strings.TrimRight(stdout, "\r\n")
+	// Truncated output cannot be trusted: decoding it would look like a
+	// corrupt token and start a login that overwrites a valid entry.
+	if out.stdoutTruncated {
+		return nil, fmt.Errorf(
+			"token get command %q wrote more than %d bytes to stdout; refusing to read a truncated token",
+			strings.Join(c.getCmd, " "),
+			commandStdoutLimit,
+		)
+	}
+
+	value := strings.TrimRight(out.stdout, "\r\n")
 	if value == "" {
 		logger.Log.Warn().
 			Str("command", strings.Join(c.getCmd, " ")).
@@ -104,9 +121,9 @@ func (c *CommandTokenStore) Set(ctx context.Context, key string, token *oauth2.T
 	if err != nil {
 		return err
 	}
-	_, stderr, err := c.run(ctx, c.setCmd, key, encoded)
+	out, err := c.run(ctx, c.setCmd, key, encoded)
 	if err != nil {
-		return commandError("set", c.setCmd, err, stderr)
+		return commandError("set", c.setCmd, err, out.stderr)
 	}
 	return nil
 }
@@ -119,10 +136,19 @@ func (c *CommandTokenStore) isNotFoundExitCode(code int) bool {
 	return ok
 }
 
+// commandOutput carries capped command output plus whether either stream was
+// cut off, so callers can refuse to parse incomplete data.
+type commandOutput struct {
+	stdout          string
+	stderr          string
+	stdoutTruncated bool
+	stderrTruncated bool
+}
+
 // run executes argv in its own process group with the token key exported and
 // returns both capped output streams. Exit errors are returned unwrapped so
 // callers can map them to "not found" or a real failure.
-func (c *CommandTokenStore) run(ctx context.Context, argv []string, key, input string) (string, string, error) {
+func (c *CommandTokenStore) run(ctx context.Context, argv []string, key, input string) (commandOutput, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
@@ -137,13 +163,23 @@ func (c *CommandTokenStore) run(ctx context.Context, argv []string, key, input s
 	cmd.WaitDelay = 2 * time.Second
 	configureProcessGroup(cmd)
 
-	if err := cmd.Run(); err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return stdout.String(), stderr.String(), fmt.Errorf("timed out after %s", c.timeout)
-		}
-		return stdout.String(), stderr.String(), err
+	runErr := cmd.Run()
+	out := commandOutput{
+		stdout:          stdout.String(),
+		stderr:          stderr.String(),
+		stdoutTruncated: stdout.Truncated(),
+		stderrTruncated: stderr.Truncated(),
 	}
-	return stdout.String(), stderr.String(), nil
+	if runErr != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			if errors.Is(ctxErr, context.DeadlineExceeded) {
+				return out, fmt.Errorf("timed out after %s", c.timeout)
+			}
+			return out, fmt.Errorf("token command canceled: %w", ctxErr)
+		}
+		return out, runErr
+	}
+	return out, nil
 }
 
 // commandError describes a failing token command without leaking more output
@@ -183,11 +219,15 @@ func (c *cappedBuffer) Write(p []byte) (int, error) {
 	return c.buf.Write(p)
 }
 
+// String returns the raw prefix that fit in the buffer. It never adds
+// presentation characters: callers that need to display it use truncate.
 func (c *cappedBuffer) String() string {
-	if !c.truncated {
-		return c.buf.String()
-	}
-	return strings.ToValidUTF8(c.buf.String(), "") + "…"
+	return c.buf.String()
+}
+
+// Truncated reports whether bytes were dropped.
+func (c *cappedBuffer) Truncated() bool {
+	return c.truncated
 }
 
 func truncate(value string) string {
