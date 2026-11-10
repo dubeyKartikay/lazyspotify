@@ -174,11 +174,11 @@ func TestGetDefaultAppConfigUsesSystemKeyring(t *testing.T) {
 	if got := cfg.Auth.TokenStore.Command.Timeout; got != defaultTokenStoreCommandTimeout {
 		t.Fatalf("Auth.TokenStore.Command.Timeout = %d, want %d", got, defaultTokenStoreCommandTimeout)
 	}
-	if got := cfg.Auth.TokenStore.Key; got != "token-v2" {
-		t.Fatalf("Auth.TokenStore.Key = %q, want %q", got, "token-v2")
+	if got := cfg.Auth.TokenStore.Key; got != "" {
+		t.Fatalf("Auth.TokenStore.Key = %q, want empty (the resolver owns the default)", got)
 	}
-	if got := cfg.Auth.Keyring.Key; got != "" {
-		t.Fatalf("Auth.Keyring.Key = %q, want empty (deprecated alias has no default)", got)
+	if got := cfg.AuthTokenKey(); got != defaultTokenKey {
+		t.Fatalf("AuthTokenKey() = %q, want %q", got, defaultTokenKey)
 	}
 }
 
@@ -465,20 +465,6 @@ func TestValidateTokenStoreConfigRejectsNonPositiveNotFoundExitCode(t *testing.T
 	}
 }
 
-func TestValidateStartupConfigRequiresTokenKey(t *testing.T) {
-	cfg := validConfig()
-	cfg.Auth.TokenStore.Key = ""
-	cfg.Auth.Keyring.Key = ""
-
-	err := validateStartupConfig(cfg)
-	if err == nil {
-		t.Fatal("validateStartupConfig() = nil error, want missing token key error")
-	}
-	if !strings.Contains(err.Error(), "auth.token-store.key") {
-		t.Fatalf("validateStartupConfig() = %q, want the config key", err.Error())
-	}
-}
-
 func TestLoadConfigReadsTokenStoreKeyAndExitCodes(t *testing.T) {
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
@@ -517,16 +503,20 @@ func TestLoadConfigReadsTokenStoreKeyAndExitCodes(t *testing.T) {
 	}
 }
 
-func TestAuthTokenKeyFallsBackToDeprecatedKeyringKey(t *testing.T) {
+func TestAuthTokenKeyResolution(t *testing.T) {
 	cfg := AppConfig{}
-	cfg.Auth.Keyring.Key = "token-v2"
-	if got := cfg.AuthTokenKey(); got != "token-v2" {
-		t.Fatalf("AuthTokenKey() = %q, want %q from auth.keyring.key", got, "token-v2")
+	if got := cfg.AuthTokenKey(); got != defaultTokenKey {
+		t.Fatalf("AuthTokenKey() = %q, want the default %q", got, defaultTokenKey)
 	}
 
-	cfg.Auth.TokenStore.Key = "token-v3"
-	if got := cfg.AuthTokenKey(); got != "token-v3" {
-		t.Fatalf("AuthTokenKey() = %q, want %q to prefer auth.token-store.key", got, "token-v3")
+	cfg.Auth.Keyring.Key = "legacy-key"
+	if got := cfg.AuthTokenKey(); got != "legacy-key" {
+		t.Fatalf("AuthTokenKey() = %q, want %q from the deprecated key", got, "legacy-key")
+	}
+
+	cfg.Auth.TokenStore.Key = "canonical-key"
+	if got := cfg.AuthTokenKey(); got != "canonical-key" {
+		t.Fatalf("AuthTokenKey() = %q, want %q to prefer the canonical key", got, "canonical-key")
 	}
 }
 

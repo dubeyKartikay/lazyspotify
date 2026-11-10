@@ -282,6 +282,27 @@ func TestCommandTokenStoreCanceledContextIsAnError(t *testing.T) {
 	}
 }
 
+func TestCommandTokenStoreTruncatedStderrIsNoted(t *testing.T) {
+	requireSh(t)
+	store, err := NewCommandTokenStore(
+		[]string{"sh", "-c", `printf '%5000s' '' | tr ' ' 'x' >&2; exit 2`},
+		[]string{"sh", "-c", `cat > /dev/null`},
+		[]int{1},
+		time.Second,
+	)
+	if err != nil {
+		t.Fatalf("NewCommandTokenStore() error = %v, want nil", err)
+	}
+
+	_, err = store.Get(context.Background(), "token-v2")
+	if err == nil || errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("Get() = %v, want a real failure", err)
+	}
+	if !strings.Contains(err.Error(), "(stderr truncated)") {
+		t.Fatalf("Get() = %q, want the truncated-stderr note", err.Error())
+	}
+}
+
 func TestCommandTokenStoreSetReportsStderr(t *testing.T) {
 	requireSh(t)
 	store, err := NewCommandTokenStore(

@@ -187,7 +187,7 @@ The generated daemon config is written automatically under the `librespot/` subd
 | `auth.timeout` | No | `30` | Auth server shutdown timeout in seconds. |
 | `auth.keyring.service` | No | `spotify` | Keyring service name for stored tokens. |
 | `auth.token-store.key` | No | `token-v2` | Key under which the token is stored, for every backend. |
-| `auth.keyring.key` | No | none | Deprecated alias for `auth.token-store.key`; used only when the canonical key is unset. |
+| `auth.keyring.key` | No | none | Deprecated fallback, used when `auth.token-store.key` is empty. |
 | `auth.token-store.backend` | No | `keyring` | Where the login token is stored: `keyring`, `file`, or `command`. See [Headless and non-keyring setups](#headless-and-non-keyring-setups). |
 | `auth.token-store.file.path` | No | `token.json` in the config directory | Token file used by the `file` backend. `~` is expanded, relative paths resolve against the config directory, and the path must name a file. |
 | `auth.token-store.command.get` | For `command` | none | Argv that prints the stored token on stdout. It must exit non-zero **only** when no token exists yet. |

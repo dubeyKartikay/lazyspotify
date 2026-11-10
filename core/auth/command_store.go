@@ -93,7 +93,7 @@ func (c *CommandTokenStore) Get(ctx context.Context, key string) (*oauth2.Token,
 				Msg("token get command reported a missing token; login required")
 			return nil, ErrTokenNotFound
 		}
-		return nil, commandError("get", c.getCmd, err, out.stderr)
+		return nil, commandError("get", c.getCmd, err, out)
 	}
 
 	// Truncated output cannot be trusted: decoding it would look like a
@@ -123,7 +123,7 @@ func (c *CommandTokenStore) Set(ctx context.Context, key string, token *oauth2.T
 	}
 	out, err := c.run(ctx, c.setCmd, key, encoded)
 	if err != nil {
-		return commandError("set", c.setCmd, err, out.stderr)
+		return commandError("set", c.setCmd, err, out)
 	}
 	return nil
 }
@@ -183,10 +183,19 @@ func (c *CommandTokenStore) run(ctx context.Context, argv []string, key, input s
 }
 
 // commandError describes a failing token command without leaking more output
-// than a person needs to diagnose it.
-func commandError(action string, argv []string, err error, stderr string) error {
+// than a person needs to diagnose it. Truncated stderr is called out so the
+// excerpt is not mistaken for the whole story.
+func commandError(action string, argv []string, err error, out commandOutput) error {
 	command := strings.Join(argv, " ")
-	if message := truncate(stderr); message != "" {
+	message := truncate(out.stderr)
+	if out.stderrTruncated {
+		if message == "" {
+			message = "stderr truncated"
+		} else {
+			message += " (stderr truncated)"
+		}
+	}
+	if message != "" {
 		return fmt.Errorf("token %s command %q failed: %w: %s", action, command, err, message)
 	}
 	return fmt.Errorf("token %s command %q failed: %w", action, command, err)

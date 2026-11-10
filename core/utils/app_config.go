@@ -26,6 +26,7 @@ const (
 	TokenStoreBackendCommand = "command"
 
 	defaultTokenStoreCommandTimeout = 10
+	defaultTokenKey                 = "token-v2"
 )
 
 var supportedTokenStoreBackends = []string{
@@ -114,12 +115,16 @@ func (c AppConfig) SpotifyClientID() string {
 }
 
 // AuthTokenKey returns the key the token is stored under. auth.token-store.key
-// is canonical; auth.keyring.key stays a deprecated alias.
+// is canonical; auth.keyring.key stays a deprecated fallback. The resolver
+// carries the default so callers never see an empty key.
 func (c AppConfig) AuthTokenKey() string {
 	if key := strings.TrimSpace(c.Auth.TokenStore.Key); key != "" {
 		return key
 	}
-	return strings.TrimSpace(c.Auth.Keyring.Key)
+	if key := strings.TrimSpace(c.Auth.Keyring.Key); key != "" {
+		return key
+	}
+	return defaultTokenKey
 }
 
 func getDefaultAppConfig() AppConfig {
@@ -130,7 +135,6 @@ func getDefaultAppConfig() AppConfig {
 	cfg.Auth.RedirectEndpoint = "/callback"
 	cfg.Auth.Timeout = 30
 	cfg.Auth.Keyring.Service = "spotify"
-	cfg.Auth.TokenStore.Key = "token-v2"
 	cfg.Auth.TokenStore.Backend = TokenStoreBackendKeyring
 	cfg.Auth.TokenStore.Command.Timeout = defaultTokenStoreCommandTimeout
 	cfg.Librespot.Host = "127.0.0.1"
@@ -174,23 +178,7 @@ func LoadConfig() (AppConfig, error) {
 	if err != nil {
 		return AppConfig{}, fmt.Errorf("failed to parse config: %w", err)
 	}
-	applyDeprecatedTokenKey(v, &config)
 	return config, nil
-}
-
-// applyDeprecatedTokenKey lets existing configs keep their custom
-// auth.keyring.key while auth.token-store.key carries the default. The
-// deprecated value only wins when the canonical key was not set explicitly.
-func applyDeprecatedTokenKey(v *viper.Viper, cfg *AppConfig) {
-	if v.InConfig("auth.token-store.key") || os.Getenv("AUTH_TOKEN_STORE_KEY") != "" {
-		return
-	}
-	if !v.InConfig("auth.keyring.key") && os.Getenv("AUTH_KEYRING_KEY") == "" {
-		return
-	}
-	if key := strings.TrimSpace(cfg.Auth.Keyring.Key); key != "" {
-		cfg.Auth.TokenStore.Key = key
-	}
 }
 
 func ValidateStartupConfig() error {
@@ -203,9 +191,6 @@ func ValidateStartupConfig() error {
 func validateStartupConfig(cfg AppConfig) error {
 	if clientID := cfg.SpotifyClientID(); clientID == "" || clientID == spotifyClientIDPlaceholder {
 		return fmt.Errorf("missing required config value `auth.client_id`; see %s", SpotifyClientIDHelpURL)
-	}
-	if key := cfg.AuthTokenKey(); key == "" {
-		return fmt.Errorf("missing required config value `auth.token-store.key`")
 	}
 	return validateTokenStoreConfig(cfg)
 }
