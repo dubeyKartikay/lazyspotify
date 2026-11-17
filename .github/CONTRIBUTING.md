@@ -15,7 +15,7 @@ Thanks for contributing to `lazyspotify`.
 
 - Go `1.25.6` or newer.
 - A Spotify Premium account if you want to exercise playback flows manually.
-- A working system keyring.
+- A working system keyring, or a headless token store backend (`auth.token-store.backend`).
 - The patched `lazyspotify-librespot` daemon for source builds.
 
 ### Clone and Run

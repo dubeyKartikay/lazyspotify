@@ -16,13 +16,13 @@ func (m *Model) View(maxW, maxH int) string {
 	}
 	m.displayScreen.SetSize(listW+playerW, 3)
 	content := lipgloss.JoinHorizontal(lipgloss.Top, mediaList, playerView)
-	if(!m.zenMode){
+	if !m.zenMode {
 		content = lipgloss.JoinVertical(lipgloss.Left, m.displayScreen.View(), content)
 	}
 	v := lipgloss.NewStyle().BorderStyle(lipgloss.HiddenBorder()).Render(content)
 	w, h := lipgloss.Size(v)
 	if ((w > maxW) || (h > maxH)) && m.mediaListOpen {
-    return lipgloss.NewStyle().BorderStyle(lipgloss.HiddenBorder()).Render(mediaList)
-  }
+		return lipgloss.NewStyle().BorderStyle(lipgloss.HiddenBorder()).Render(mediaList)
+	}
 	return v
 }

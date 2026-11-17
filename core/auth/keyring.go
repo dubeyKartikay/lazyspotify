@@ -1,70 +1,61 @@
 package auth
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
 	"runtime"
 
-	"github.com/dubeyKartikay/lazyspotify/core/logger"
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 )
 
-type Keyring struct {
+// KeyringStore stores tokens in the system keyring through Secret Service on
+// Linux and the platform equivalents elsewhere.
+type KeyringStore struct {
 	service string
 }
 
-func NewSpotifyKeyring() *Keyring {
-	return &Keyring{service: utils.GetConfig().Auth.Keyring.Service}
+// NewKeyringStore builds a keyring store for the given keyring service name.
+func NewKeyringStore(service string) *KeyringStore {
+	return &KeyringStore{service: service}
 }
 
-func (k *Keyring) GetString(key string) (string, error) {
+func (k *KeyringStore) Get(ctx context.Context, key string) (*oauth2.Token, error) {
+	_ = ctx
 	value, err := keyring.Get(k.service, key)
 	if err != nil {
-		return "", wrapKeyringError(err)
+		return nil, wrapKeyringError(err)
 	}
-	return value, nil
+	return decodeToken(key, value)
 }
 
-func (k *Keyring) SetString(key, value string) error {
-	return wrapKeyringError(keyring.Set(k.service, key, value))
-}
-
-func (k *Keyring) GetToken(key string) (*oauth2.Token, error) {
-	savedToken := oauth2.Token{}
-	ser_token, err := k.GetString(key)
+func (k *KeyringStore) Set(ctx context.Context, key string, token *oauth2.Token) error {
+	_ = ctx
+	encoded, err := encodeToken(token)
 	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal([]byte(ser_token), &savedToken)
-	if err != nil {
-		return nil, err
-	}
-	return &savedToken, nil
-}
-
-func (k *Keyring) SetToken(key string, token *oauth2.Token) error {
-	ser_token, err := json.Marshal(token)
-	if err != nil {
-		logger.Log.Error().Err(err).Msg("error marshaling token")
 		return err
 	}
-	return k.SetString(key, string(ser_token))
+	return wrapKeyringError(keyring.Set(k.service, key, encoded))
 }
 
 func wrapKeyringError(err error) error {
-	if err == nil || errors.Is(err, keyring.ErrNotFound) {
-		return err
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, keyring.ErrNotFound) {
+		return ErrTokenNotFound
 	}
 
 	if runtime.GOOS == "linux" {
 		return fmt.Errorf(
-			"system keyring unavailable: %w; lazyspotify requires a working Linux keyring and will not fall back to plaintext token storage",
+			"system keyring unavailable: %w; start a Secret Service provider (for example gnome-keyring or KWallet) or set auth.token-store.backend to \"file\" or \"command\"",
 			err,
 		)
 	}
 
-	return fmt.Errorf("system keyring unavailable: %w", err)
+	return fmt.Errorf(
+		"system keyring unavailable: %w; set auth.token-store.backend to \"file\" or \"command\" to store tokens another way",
+		err,
+	)
 }

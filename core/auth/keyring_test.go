@@ -8,12 +8,16 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-func TestWrapKeyringErrorPreservesNilAndNotFound(t *testing.T) {
+func TestWrapKeyringErrorPreservesNil(t *testing.T) {
 	if err := wrapKeyringError(nil); err != nil {
 		t.Fatalf("wrapKeyringError(nil) = %v, want nil", err)
 	}
-	if err := wrapKeyringError(keyring.ErrNotFound); !errors.Is(err, keyring.ErrNotFound) {
-		t.Fatalf("wrapKeyringError(ErrNotFound) = %v, want errors.Is ErrNotFound", err)
+}
+
+func TestWrapKeyringErrorMapsMissingToken(t *testing.T) {
+	err := wrapKeyringError(keyring.ErrNotFound)
+	if !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("wrapKeyringError(ErrNotFound) = %v, want errors.Is ErrTokenNotFound", err)
 	}
 }
 
@@ -29,5 +33,8 @@ func TestWrapKeyringErrorAddsActionableContext(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "system keyring unavailable") {
 		t.Fatalf("wrapKeyringError() = %q, want system keyring context", err.Error())
+	}
+	if !strings.Contains(err.Error(), "auth.token-store.backend") {
+		t.Fatalf("wrapKeyringError() = %q, want alternate backend hint", err.Error())
 	}
 }
