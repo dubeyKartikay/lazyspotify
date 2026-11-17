@@ -38,12 +38,14 @@ jobs:
       - name: Capture release metadata
         id: meta
         run: |
-          echo "release_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          echo "release_version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          echo "source_bundle_name=lazyspotify-v${GITHUB_REF_NAME#v}-src.tar.gz" >> "$GITHUB_OUTPUT"
-          echo "source_bundle_dir=lazyspotify-v${GITHUB_REF_NAME#v}-src" >> "$GITHUB_OUTPUT"
-          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-          echo "source_commit=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          {
+            echo "release_tag=${GITHUB_REF_NAME}"
+            echo "release_version=${GITHUB_REF_NAME#v}"
+            echo "source_bundle_name=lazyspotify-v${GITHUB_REF_NAME#v}-src.tar.gz"
+            echo "source_bundle_dir=lazyspotify-v${GITHUB_REF_NAME#v}-src"
+            echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "source_commit=${GITHUB_SHA}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create bundled source archive
         run: scripts/release/create-source-bundle.sh --output-dir dist
@@ -266,7 +268,7 @@ jobs:
           - arch: amd64
             runner: macos-15-intel
           - arch: arm64
-            runner: macos-14
+            runner: macos-15
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -396,7 +398,7 @@ jobs:
     needs:
       - prepare
       - draft-release
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Detect Homebrew tap token
