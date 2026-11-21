@@ -2,6 +2,7 @@ package medialist
 
 import (
 	"fmt"
+	"strings"
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
@@ -131,13 +132,18 @@ type listItem struct {
 }
 
 func (i listItem) Title() string {
-	return i.entity.Name
+	title := common.StripEmojis(i.entity.Name)
+	// handle edge case where entity title is only emojis
+	if strings.TrimSpace(title) == "" {
+		return "(untitled)"
+	}
+	return title
 }
 
 func (i listItem) Description() string {
-	return i.entity.Desc
+	return common.StripEmojis(i.entity.Desc)
 }
 
 func (i listItem) FilterValue() string {
-	return fmt.Sprintf("%s %s", i.entity.Name, i.entity.Desc)
+	return fmt.Sprintf("%s %s", common.StripEmojis(i.entity.Name), common.StripEmojis(i.entity.Desc))
 }
